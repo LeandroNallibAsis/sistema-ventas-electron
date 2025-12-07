@@ -6,7 +6,7 @@
 
 ## 🎯 Características
 
-✨ **100% Offline** - No requiere conexión a internet  
+✨ **100% Offline** - No requiere conexión a internet para su funcionamiento normal
 📊 **Gestión Completa** - Categorías, productos, stock  
 🏷️ **Códigos de Barras** - Genera y descarga códigos en PNG  
 🚦 **Alertas de Stock** - Visual: Disponible, Poco Stock, Sin Stock  
