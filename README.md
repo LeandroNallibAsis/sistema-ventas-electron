@@ -23,67 +23,88 @@ npm install
 
 # 2. Ejecutar la aplicación
 npm run dev
-```
+💻 Uso Básico
+1. Crear Categorías
 
----
+Haz clic en + en el sidebar → Ingresa nombre → Crear
 
-## 💻 Uso Básico
+2. Agregar Productos
 
-### 1. Crear Categorías
-Haz clic en **+** en el sidebar → Ingresa nombre → **Crear**
+Selecciona categoría → + Agregar Producto → Completa formulario
 
-### 2. Agregar Productos
-Selecciona categoría → **+ Agregar Producto** → Completa formulario
+3. Códigos de Barras
 
-### 3. Códigos de Barras
-Haz clic en 📊 junto al producto → **🖨️ Descargar PNG**
+Haz clic en 📊 junto al producto → 🖨️ Descargar PNG
 
----
+📚 Documentación
+Gestión de Proyecto
 
-## 📚 Documentación
+Acta de Constitución del Proyecto
 
-- **[INSTALACION.md](./INSTALACION.md)** - Guía completa de instalación
-- **[walkthrough.md](../.gemini/antigravity/brain/*/walkthrough.md)** - Documentación técnica
+Plan de Proyecto
 
----
+Registro de Interesados
 
-## 🛠️ Stack Tecnológico
+Registro de Riesgos
 
-- **Electron 39** - Aplicación de escritorio
-- **React 19** - UI moderna
-- **Vite 7** - Build ultrarrápido
-- **TailwindCSS 3** - Estilos profesionales
-- **SQLite** - Base de datos local
-- **jsbarcode** - Códigos de barras
+Lecciones Aprendidas
 
----
+Requerimientos
 
-## ⚙️ Scripts
+Documento de Requerimientos SRS
 
-```bash
+Historias de Usuario / Casos de Uso
+
+Diagramas UML y Flujos
+
+Modelo de Datos (ERD)
+
+Diseño de Software
+
+Arquitectura del Sistema (SAD)
+
+Diseño UI/UX
+
+Manuales Técnicos
+
+Instalación y Configuración
+
+🛠️ Stack Tecnológico
+
+Electron 39 - Aplicación de escritorio
+
+React 19 - UI moderna
+
+Vite 7 - Build ultrarrápido
+
+TailwindCSS 3 - Estilos profesionales
+
+SQLite - Base de datos local
+
+jsbarcode - Códigos de barras
+
 npm run dev      # Modo desarrollo
 npm run build    # Build producción
 npm run dist     # Crear .exe Windows
-```
 
----
+📊 Sistema de Alertas
+Badge	Stock
+🟢 Disponible	> 10 unidades
+🟡 Poco Stock	1-10 unidades
+🔴 Sin Stock	0 unidades
 
-## 📊 Sistema de Alertas
-
-| Badge | Stock |
-|-------|-------|
-| 🟢 **Disponible** | > 10 unidades |
-| 🟡 **Poco Stock** | 1-10 unidades |
-| 🔴 **Sin Stock** | 0 unidades |
-
----
-
-## 📁 Base de Datos
-
-```
 C:\Users\[Usuario]\AppData\Roaming\electro-stock\electrostock.db
-```
+
+
+✅ Este README ahora combina:
+
+1. Tu descripción, instalación, uso y stack tecnológico.  
+2. Todos los links a la documentación que ya tenés organizada en `/documentation/`.  
+3. Mantiene la estructura visual clara para GitHub.  
 
 ---
 
-**Hecho con ❤️ para pequeños y medianos negocios**
+Si querés, puedo hacer **una versión con iconos y badges más “GitHub style”** para que se vea aún más profesional al abrir el repo.  
+
+¿Querés que haga esa versión también?
+
