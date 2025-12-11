@@ -87,6 +87,15 @@ const TicketView = ({ storeConfig, saleDetails, isPreview = false, printMode = '
                 </div>
             </div>
 
+            {/* Client Info */}
+            {data.client && (
+                <div className="border-b border-dashed border-gray-400 pb-2 mb-4 text-xs">
+                    <div className="font-bold uppercase">Cliente: {data.client.name}</div>
+                    {data.client.identifier && <div>DNI/CUIT: {data.client.identifier}</div>}
+                    {data.client.address && <div>Dir: {data.client.address}</div>}
+                </div>
+            )}
+
             {/* Items */}
             <div className="mb-4">
                 <div className="space-y-2">

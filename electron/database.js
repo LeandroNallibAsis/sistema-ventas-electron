@@ -181,6 +181,34 @@ class DatabaseManager {
             )
         `);
 
+        // Clients table (Phase 2)
+        this.db.exec(`
+            CREATE TABLE IF NOT EXISTS clients (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                type TEXT DEFAULT 'consumer', -- 'consumer', 'business'
+                identifier TEXT, -- DNI, CUIT, etc.
+                phone TEXT,
+                email TEXT,
+                address TEXT,
+                notes TEXT,
+                debt REAL DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        // Migration: Add client_id to sales if not exists
+        try {
+            const columns = this.db.prepare("PRAGMA table_info(sales)").all();
+            const hasClientId = columns.some(col => col.name === 'client_id');
+            if (!hasClientId) {
+                this.db.exec('ALTER TABLE sales ADD COLUMN client_id INTEGER REFERENCES clients(id)');
+                console.log('Migration: Added client_id column to sales');
+            }
+        } catch (error) {
+            console.error('Migration error (client_id):', error);
+        }
+
         // Initialize default admin if no users exist
         this.initializeDefaultAdmin();
 
@@ -281,6 +309,69 @@ class DatabaseManager {
     getUserById(id) {
         const stmt = this.db.prepare('SELECT id, username, role, name, active FROM users WHERE id = ?');
         return stmt.get(id);
+    }
+
+    // Client Operations
+    createClient(clientData) {
+        const stmt = this.db.prepare(`
+            INSERT INTO clients (name, type, identifier, phone, email, address, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        `);
+        const result = stmt.run(
+            clientData.name,
+            clientData.type || 'consumer',
+            clientData.identifier,
+            clientData.phone,
+            clientData.email,
+            clientData.address,
+            clientData.notes
+        );
+        return { id: result.lastInsertRowid, ...clientData };
+    }
+
+    getClients() {
+        return this.db.prepare('SELECT * FROM clients ORDER BY name').all();
+    }
+
+    searchClients(query) {
+        const stmt = this.db.prepare(`
+            SELECT * FROM clients 
+            WHERE name LIKE ? OR identifier LIKE ? OR phone LIKE ?
+            ORDER BY name
+            LIMIT 20
+        `);
+        const search = `%${query}%`;
+        return stmt.all(search, search, search);
+    }
+
+    updateClient(id, data) {
+        const stmt = this.db.prepare(`
+            UPDATE clients 
+            SET name = ?, type = ?, identifier = ?, phone = ?, email = ?, address = ?, notes = ?
+            WHERE id = ?
+        `);
+        stmt.run(
+            data.name,
+            data.type,
+            data.identifier,
+            data.phone,
+            data.email,
+            data.address,
+            data.notes,
+            id
+        );
+        return this.getClientById(id);
+    }
+
+    deleteClient(id) {
+        // Prevent delete if has sales... or just set active to 0? 
+        // For now, allow delete but SQL constraint might fail if we enforce FK. 
+        // SQLite enforces FK only if PRAGMA foreign_keys = ON.
+        return this.db.prepare('DELETE FROM clients WHERE id = ?').run(id);
+    }
+
+    getClientById(id) {
+        return this.db.prepare('SELECT * FROM clients WHERE id = ?').get(id);
     }
 
     initializeStoreConfig() {
@@ -461,8 +552,8 @@ class DatabaseManager {
     createSale(saleData, items) {
         const insertSale = this.db.prepare(`
             INSERT INTO sales (payment_method, currency, subtotal, surcharge, total, installments, 
-                               customer_notes, warranty_enabled, warranty_months)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                               customer_notes, warranty_enabled, warranty_months, client_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
         const insertItem = this.db.prepare(`
@@ -490,7 +581,8 @@ class DatabaseManager {
                 sale.installments || 1,
                 sale.customer_notes || '',
                 sale.warranty_enabled ? 1 : 0,
-                sale.warranty_months || 0
+                sale.warranty_months || 0,
+                sale.client_id || null
             );
 
             const saleId = result.lastInsertRowid;
@@ -511,7 +603,7 @@ class DatabaseManager {
             }
 
             // Add cash register entry
-            const description = `Venta #${saleId} - ${sale.payment_method}`;
+            const description = `Venta #${saleId} - ${sale.payment_method} ${sale.client_id ? '(Cliente Registrado)' : ''}`;
             insertCashEntry.run(
                 sale.total,
                 sale.currency,

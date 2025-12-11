@@ -21,10 +21,15 @@ const POSScreen = () => {
     const [lastSaleDetails, setLastSaleDetails] = useState(null);
     const [error, setError] = useState('');
 
-    // Search Modal States
     const [showSearchModal, setShowSearchModal] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
+
+    // Client Search States
+    const [selectedClient, setSelectedClient] = useState(null);
+    const [showClientModal, setShowClientModal] = useState(false);
+    const [clientSearchQuery, setClientSearchQuery] = useState('');
+    const [clientResults, setClientResults] = useState([]);
 
     const barcodeInputRef = useRef(null);
     const searchInputRef = useRef(null);
@@ -78,6 +83,26 @@ const POSScreen = () => {
             console.error('Error searching products:', error);
         }
     };
+
+    const performClientSearch = async (query) => {
+        try {
+            const results = await window.api.searchClients(query);
+            setClientResults(results);
+        } catch (error) {
+            console.error('Error searching clients:', error);
+        }
+    };
+
+    useEffect(() => {
+        const timeoutId = setTimeout(() => {
+            if (clientSearchQuery.length >= 2) {
+                performClientSearch(clientSearchQuery);
+            } else {
+                setClientResults([]);
+            }
+        }, 300);
+        return () => clearTimeout(timeoutId);
+    }, [clientSearchQuery]);
 
     const handleAddFromSearch = (product) => {
         addToCart(product);
@@ -229,7 +254,8 @@ const POSScreen = () => {
                 installments,
                 customer_notes: customerNotes,
                 warranty_enabled: warranty.enabled,
-                warranty_months: warranty.enabled ? warranty.months : 0
+                warranty_months: warranty.enabled ? warranty.months : 0,
+                client_id: selectedClient?.id || null
             };
 
             const saleId = await window.api.createSale(saleData, cart);
@@ -246,7 +272,8 @@ const POSScreen = () => {
                 customerNotes,
                 warranty: { ...warranty },
                 installments,
-                id: saleId // Pass ID for ticket number
+                id: saleId, // Pass ID for ticket number
+                client: selectedClient // Pass selected client for receipt
             };
 
             // Success! Show receipt
@@ -256,8 +283,10 @@ const POSScreen = () => {
 
             // Clear cart
             setCart([]);
+            setCart([]);
             setCustomerNotes('');
             setWarranty({ enabled: false, months: 1 });
+            setSelectedClient(null); // Reset client
             setError('');
 
             // Refocus barcode input
@@ -279,7 +308,15 @@ const POSScreen = () => {
         <div className="flex h-screen bg-gray-50">
             {/* Left Panel - Barcode & Cart */}
             <div className="flex-1 flex flex-col p-6">
-                <h1 className="text-3xl font-bold text-gray-900 mb-6">💰 Punto de Venta</h1>
+                <h1 className="text-3xl font-bold text-gray-900 mb-6 flex justify-between items-center">
+                    <span>💰 Punto de Venta</span>
+                    {selectedClient && (
+                        <div className="text-sm bg-blue-50 text-blue-700 px-3 py-1 rounded-full flex items-center gap-2 border border-blue-100">
+                            <span>👤 {selectedClient.name}</span>
+                            <button onClick={() => setSelectedClient(null)} className="hover:text-blue-900">✕</button>
+                        </div>
+                    )}
+                </h1>
 
                 {/* Barcode Input & Search */}
                 <form onSubmit={handleBarcodeSubmit} className="mb-6">
@@ -305,6 +342,13 @@ const POSScreen = () => {
                             className="btn bg-secondary-600 text-white hover:bg-secondary-700 px-6 flex items-center gap-2"
                         >
                             <span>🔍</span> Buscar
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setShowClientModal(true)}
+                            className="btn bg-indigo-600 text-white hover:bg-indigo-700 px-6 flex items-center gap-2"
+                        >
+                            <span>👤</span> Cliente
                         </button>
                     </div>
                     {error && (
@@ -491,6 +535,63 @@ const POSScreen = () => {
                     saleDetails={lastSaleDetails}
                     onClose={() => setShowReceipt(false)}
                 />
+            )}
+
+            {/* Client Search Modal */}
+            {showClientModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-lg p-6 w-full max-w-lg max-h-[80vh] flex flex-col">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-xl font-bold text-gray-900">Seleccionar Cliente</h3>
+                            <button onClick={() => setShowClientModal(false)} className="text-gray-500 hover:text-gray-700 text-xl">✕</button>
+                        </div>
+
+                        <input
+                            type="text"
+                            value={clientSearchQuery}
+                            onChange={(e) => setClientSearchQuery(e.target.value)}
+                            className="input mb-4"
+                            placeholder="Buscar por nombre, DNI o teléfono..."
+                            autoFocus
+                        />
+
+                        <div className="flex-1 overflow-y-auto border border-gray-200 rounded-lg">
+                            {clientResults.length === 0 ? (
+                                <div className="p-8 text-center text-gray-500">
+                                    {clientSearchQuery.length < 2 ? "Escriba para buscar..." : "No se encontraron clientes."}
+                                </div>
+                            ) : (
+                                <table className="w-full text-left">
+                                    <tbody className="divide-y divide-gray-200">
+                                        {clientResults.map((client) => (
+                                            <tr
+                                                key={client.id}
+                                                className="hover:bg-gray-50 cursor-pointer"
+                                                onClick={() => {
+                                                    setSelectedClient(client);
+                                                    setShowClientModal(false);
+                                                    setClientSearchQuery('');
+                                                }}
+                                            >
+                                                <td className="p-3">
+                                                    <div className="font-medium text-gray-900">{client.name}</div>
+                                                    <div className="text-xs text-gray-500">{client.identifier || 'Sin DNI'} • {client.phone || 'Sin Tel'}</div>
+                                                </td>
+                                                <td className="p-3 text-right">
+                                                    {client.debt > 0 && (
+                                                        <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">
+                                                            Deuda: ${client.debt}
+                                                        </span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* Search Modal */}

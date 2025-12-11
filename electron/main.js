@@ -298,6 +298,52 @@ function setupIPC() {
             throw error;
         }
     });
+
+    // Client Management (Phase 2)
+    ipcMain.handle('get-clients', async () => {
+        try {
+            return dbManager.getClients();
+        } catch (error) {
+            console.error('Error getting clients:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('search-clients', async (event, query) => {
+        try {
+            return dbManager.searchClients(query);
+        } catch (error) {
+            console.error('Error searching clients:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('create-client', async (event, clientData) => {
+        try {
+            return dbManager.createClient(clientData);
+        } catch (error) {
+            console.error('Error creating client:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('update-client', async (event, id, clientData) => {
+        try {
+            return dbManager.updateClient(id, clientData);
+        } catch (error) {
+            console.error('Error updating client:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('delete-client', async (event, id) => {
+        try {
+            return dbManager.deleteClient(id);
+        } catch (error) {
+            console.error('Error deleting client:', error);
+            throw error;
+        }
+    });
 }
 
 app.whenReady().then(() => {

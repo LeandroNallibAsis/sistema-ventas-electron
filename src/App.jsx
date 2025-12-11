@@ -13,21 +13,123 @@ import './index.css';
 
 import LoginScreen from './components/LoginScreen';
 import UserManagement from './components/UserManagement';
+import ClientManagement from './components/ClientManagement';
 
 function App() {
   const [user, setUser] = useState(null); // { id, username, role, name }
-  const [currentView, setCurrentView] = useState('dashboard'); // views...
+  const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard', 'inventory', 'pos', 'sales', 'cash', 'reports', 'settings', 'users', 'clients'
 
-  // ... (keep state variables)
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [products, setProducts] = useState([]);
   const [showProductForm, setShowProductForm] = useState(false);
-  const [editingProduct, setEditingUser] = useState(null); // Fixed typo setEditingUser -> setEditingProduct but wait, line 21 was setEditingProduct
-  const [editingProductState, setEditingProduct] = useState(null); // Careful with variable name conflicts
+  const [editingProduct, setEditingProduct] = useState(null);
   const [showBarcode, setShowBarcode] = useState(null);
 
-  // ... (keep useEffects and handlers)
+  // Load categories on mount
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  // Load products when category changes
+  useEffect(() => {
+    if (selectedCategory && currentView === 'inventory') {
+      loadProducts(selectedCategory.id);
+    } else {
+      setProducts([]);
+    }
+  }, [selectedCategory, currentView]);
+
+  const loadCategories = async () => {
+    try {
+      const cats = await window.api.getCategories();
+      setCategories(cats);
+
+      // Auto-select first category if none selected
+      if (!selectedCategory && cats.length > 0) {
+        setSelectedCategory(cats[0]);
+      }
+    } catch (error) {
+      console.error('Error loading categories:', error);
+      alert('Error al cargar categorías');
+    }
+  };
+
+  const loadProducts = async (categoryId) => {
+    try {
+      const prods = await window.api.getProducts(categoryId);
+      setProducts(prods);
+    } catch (error) {
+      console.error('Error loading products:', error);
+      alert('Error al cargar productos');
+    }
+  };
+
+  const handleCreateCategory = async (name) => {
+    try {
+      const newCategory = await window.api.createCategory(name);
+      await loadCategories();
+      setSelectedCategory(newCategory);
+    } catch (error) {
+      console.error('Error creating category:', error);
+      alert('Error al crear categoría. Puede que ya exista.');
+    }
+  };
+
+  const handleDeleteCategory = async (id) => {
+    try {
+      await window.api.deleteCategory(id);
+      await loadCategories();
+      setSelectedCategory(null);
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      alert('Error al eliminar categoría');
+    }
+  };
+
+  const handleCreateProduct = async (productData) => {
+    try {
+      await window.api.createProduct(productData);
+      await loadProducts(selectedCategory.id);
+      setShowProductForm(false);
+      setEditingProduct(null);
+    } catch (error) {
+      console.error('Error creating product:', error);
+      alert('Error al crear producto');
+    }
+  };
+
+  const handleUpdateProduct = async (productData) => {
+    try {
+      await window.api.updateProduct(editingProduct.id, productData);
+      await loadProducts(selectedCategory.id);
+      setShowProductForm(false);
+      setEditingProduct(null);
+    } catch (error) {
+      console.error('Error updating product:', error);
+      alert('Error al actualizar producto');
+    }
+  };
+
+  const handleDeleteProduct = async (id) => {
+    try {
+      await window.api.deleteProduct(id);
+      await loadProducts(selectedCategory.id);
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      alert('Error al eliminar producto');
+    }
+  };
+
+  const handleEditProduct = (product) => {
+    setEditingProduct(product);
+    setShowProductForm(true);
+  };
+
+  const handleAddProduct = () => {
+    setEditingProduct(null);
+    setShowProductForm(true);
+  };
 
   // Auth Handler
   const handleLogin = (userData) => {
@@ -44,11 +146,18 @@ function App() {
     setCurrentView('dashboard');
   };
 
+  // Helper for determining visibility
+  const canShow = (view) => {
+    if (user?.role === 'admin') return true;
+    if (user?.role === 'seller') return ['pos', 'sales', 'clients'].includes(view);
+    return false;
+  };
+
   // Render different views based on currentView
   const renderContent = () => {
     // Security check for views
     if (user?.role === 'seller') {
-      if (!['pos', 'sales'].includes(currentView)) {
+      if (!['pos', 'sales', 'clients'].includes(currentView)) { // Allow clients for seller
         return <div className="p-8">Acceso no autorizado</div>;
       }
     }
@@ -56,10 +165,13 @@ function App() {
     switch (currentView) {
       case 'dashboard':
         return <Dashboard onNavigate={setCurrentView} />;
+
       case 'pos':
-        return <POSScreen user={user} />; // Pass user for tracking sales?
+        return <POSScreen user={user} />;
+
       case 'sales':
         return <SalesHistory />;
+
       case 'cash':
         return <CashRegister />;
       case 'reports':
@@ -68,9 +180,11 @@ function App() {
         return <SettingsScreen />;
       case 'users':
         return <UserManagement />;
+      case 'clients':
+        return <ClientManagement />;
+
       case 'inventory':
       default:
-        // Inventory Login
         return (
           <div className="flex h-screen bg-gray-50">
             {/* Sidebar (Categories) */}
@@ -80,7 +194,7 @@ function App() {
               onSelectCategory={setSelectedCategory}
               onCreateCategory={handleCreateCategory}
               onDeleteCategory={handleDeleteCategory}
-              readOnly={user?.role === 'seller'} // Just in case
+              readOnly={user?.role === 'seller'}
             />
 
             {/* Main Content */}
@@ -134,7 +248,7 @@ function App() {
             {/* Modals */}
             {showProductForm && (
               <ProductForm
-                product={editingProduct} // Use correct state variable
+                product={editingProduct}
                 categoryId={selectedCategory?.id}
                 onSubmit={editingProduct ? handleUpdateProduct : handleCreateProduct}
                 onCancel={() => {
@@ -158,13 +272,6 @@ function App() {
   if (!user) {
     return <LoginScreen onLogin={handleLogin} />;
   }
-
-  // Helper for determining visibility
-  const canShow = (view) => {
-    if (user?.role === 'admin') return true;
-    if (user?.role === 'seller') return ['pos', 'sales'].includes(view);
-    return false;
-  };
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -209,6 +316,15 @@ function App() {
           >
             📊 Historial de Ventas
           </button>
+
+          {canShow('clients') && (
+            <button
+              onClick={() => setCurrentView('clients')}
+              className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${currentView === 'clients' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
+            >
+              👥 Clientes
+            </button>
+          )}
 
           {canShow('cash') && (
             <button
