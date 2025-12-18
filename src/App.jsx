@@ -14,10 +14,13 @@ import './index.css';
 import LoginScreen from './components/LoginScreen';
 import UserManagement from './components/UserManagement';
 import ClientManagement from './components/ClientManagement';
+import SupplierManagement from './components/SupplierManagement';
+import PurchaseManagement from './components/PurchaseManagement';
+import NotesBoard from './components/NotesBoard';
 
 function App() {
   const [user, setUser] = useState(null); // { id, username, role, name }
-  const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard', 'inventory', 'pos', 'sales', 'cash', 'reports', 'settings', 'users', 'clients'
+  const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard', 'inventory', 'pos', 'sales', 'cash', 'reports', 'settings', 'users', 'clients', 'suppliers', 'purchases'
 
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -157,8 +160,10 @@ function App() {
   const renderContent = () => {
     // Security check for views
     if (user?.role === 'seller') {
-      if (!['pos', 'sales', 'clients'].includes(currentView)) { // Allow clients for seller
-        return <div className="p-8">Acceso no autorizado</div>;
+      if (user?.role === 'seller') {
+        if (!['pos', 'sales', 'clients', 'notes'].includes(currentView)) { // Allow clients for seller
+          return <div className="p-8">Acceso no autorizado</div>;
+        }
       }
     }
 
@@ -182,6 +187,13 @@ function App() {
         return <UserManagement />;
       case 'clients':
         return <ClientManagement />;
+      case 'suppliers':
+        return <SupplierManagement />;
+      case 'purchases':
+        return <PurchaseManagement />;
+
+      case 'notes':
+        return <NotesBoard />;
 
       case 'inventory':
       default:
@@ -325,6 +337,31 @@ function App() {
               👥 Clientes
             </button>
           )}
+
+          {canShow('suppliers') && (
+            <button
+              onClick={() => setCurrentView('suppliers')}
+              className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${currentView === 'suppliers' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
+            >
+              📦 Proveedores
+            </button>
+          )}
+
+          {canShow('purchases') && (
+            <button
+              onClick={() => setCurrentView('purchases')}
+              className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${currentView === 'purchases' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
+            >
+              🛒 Compras
+            </button>
+          )}
+
+          <button
+            onClick={() => setCurrentView('notes')}
+            className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${currentView === 'notes' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
+          >
+            📌 Pizarra de Notas
+          </button>
 
           {canShow('cash') && (
             <button

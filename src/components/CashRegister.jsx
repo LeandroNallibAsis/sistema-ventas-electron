@@ -245,6 +245,44 @@ const CashRegister = () => {
         setShowExportModal(false);
     };
 
+    const handleBackupCashRegister = async () => {
+        try {
+            const result = await window.api.exportCashRegister();
+            if (result.success) {
+                alert(`Backup guardado exitosamente en:\n${result.path}`);
+            }
+        } catch (error) {
+            console.error('Error backing up cash register:', error);
+            alert('Error al crear backup');
+        }
+    };
+
+    const handleRestoreCashRegister = async () => {
+        const mode = confirm(
+            '¿Desea REEMPLAZAR todos los datos actuales?\n\n' +
+            'OK = Reemplazar todo (borra datos actuales)\n' +
+            'Cancelar = Agregar a los datos existentes'
+        ) ? 'replace' : 'append';
+
+        if (mode === 'replace') {
+            if (!confirm('⚠️ ADVERTENCIA: Esto borrará TODOS los datos actuales del libro de caja.\n\n¿Está seguro?')) {
+                return;
+            }
+        }
+
+        try {
+            const result = await window.api.importCashRegister(mode);
+            if (result.success) {
+                alert(`Restauración exitosa: ${result.count} registros importados`);
+                loadCashRegister();
+                loadBalances();
+            }
+        } catch (error) {
+            console.error('Error restoring cash register:', error);
+            alert('Error al restaurar backup. Verifique que el archivo Excel sea válido.');
+        }
+    };
+
     const getCategoryLabel = (value) => {
         const cat = EXPENSE_CATEGORIES.find(c => c.value === value);
         return cat ? cat.label : value;
@@ -260,6 +298,20 @@ const CashRegister = () => {
                         className="btn btn-secondary"
                     >
                         📥 Exportar Excel
+                    </button>
+                    <button
+                        onClick={handleBackupCashRegister}
+                        className="btn bg-blue-600 text-white hover:bg-blue-700"
+                        title="Exportar backup completo de la caja"
+                    >
+                        💾 Backup Completo
+                    </button>
+                    <button
+                        onClick={handleRestoreCashRegister}
+                        className="btn bg-purple-600 text-white hover:bg-purple-700"
+                        title="Importar backup de la caja"
+                    >
+                        📂 Restaurar Backup
                     </button>
                     <button
                         onClick={() => setShowIncomeForm(true)}

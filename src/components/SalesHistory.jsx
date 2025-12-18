@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { formatCurrency, formatDate, formatReceiptNumber } from '../utils/paymentCalculator';
+import ReceiptModal from './ReceiptModal';
 
 const SalesHistory = () => {
     const [sales, setSales] = useState([]);
     const [filteredSales, setFilteredSales] = useState([]);
     const [selectedSale, setSelectedSale] = useState(null);
+    const [showReceiptModal, setShowReceiptModal] = useState(false);
+    const [receiptData, setReceiptData] = useState(null);
     const [filters, setFilters] = useState({
         startDate: '',
         endDate: '',
@@ -54,6 +57,23 @@ const SalesHistory = () => {
             setSelectedSale(detail);
         } catch (error) {
             console.error('Error loading sale detail:', error);
+        }
+    };
+
+    const handleReprint = async (saleId) => {
+        try {
+            const detail = await window.api.getSaleDetail(saleId);
+            // Map to ReceiptModal format
+            setReceiptData({
+                ...detail.sale,
+                items: detail.items,
+                paymentMethod: detail.sale.payment_method, // Ensure compatibility
+                subtotal: detail.sale.total - (detail.sale.surcharge || 0)
+            });
+            setShowReceiptModal(true);
+        } catch (error) {
+            console.error('Error loading sale for reprint:', error);
+            alert('Error al cargar datos para reimpresión');
         }
     };
 
@@ -207,6 +227,13 @@ const SalesHistory = () => {
                                                 >
                                                     Ver Detalle
                                                 </button>
+                                                <button
+                                                    onClick={() => handleReprint(sale.id)}
+                                                    className="text-gray-600 hover:text-gray-900 font-medium whitespace-nowrap ml-3"
+                                                    title="Reimprimir Ticket"
+                                                >
+                                                    🖨️
+                                                </button>
                                             </td>
                                         </tr>
                                     ))
@@ -306,6 +333,16 @@ const SalesHistory = () => {
                         </div>
                     </div>
                 </div>
+            )}
+            {/* Receipt Modal for Reprint */}
+            {showReceiptModal && (
+                <ReceiptModal
+                    saleDetails={receiptData}
+                    onClose={() => {
+                        setShowReceiptModal(false);
+                        setReceiptData(null);
+                    }}
+                />
             )}
         </div>
     );

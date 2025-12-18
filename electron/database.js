@@ -209,6 +209,62 @@ class DatabaseManager {
             console.error('Migration error (client_id):', error);
         }
 
+        // Suppliers table (Phase 2 - Supplier Management)
+        this.db.exec(`
+            CREATE TABLE IF NOT EXISTS suppliers (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                company TEXT,
+                products_sold TEXT,
+                contact_phone TEXT,
+                shipping_methods TEXT,
+                notes TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        // Purchases table (Phase 2 - Supplier Management)
+        this.db.exec(`
+            CREATE TABLE IF NOT EXISTS purchases (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                supplier_id INTEGER NOT NULL,
+                description TEXT NOT NULL,
+                total_amount REAL NOT NULL,
+                paid_amount REAL DEFAULT 0,
+                payment_status TEXT DEFAULT 'pending',
+                purchase_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                due_date TEXT,
+                notes TEXT,
+                FOREIGN KEY (supplier_id) REFERENCES suppliers(id)
+            )
+        `);
+
+        // Purchase payments table (Phase 2 - Supplier Management)
+        this.db.exec(`
+            CREATE TABLE IF NOT EXISTS purchase_payments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                purchase_id INTEGER NOT NULL,
+                amount REAL NOT NULL,
+                payment_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                payment_method TEXT,
+                notes TEXT,
+                FOREIGN KEY (purchase_id) REFERENCES purchases(id)
+            )
+        `);
+
+        // Notes table (Board Feature)
+        this.db.exec(`
+            CREATE TABLE IF NOT EXISTS notes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT,
+                content TEXT,
+                color TEXT DEFAULT 'bg-yellow-200',
+                is_completed INTEGER DEFAULT 0,
+                position_order INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
         // Initialize default admin if no users exist
         this.initializeDefaultAdmin();
 
@@ -902,6 +958,281 @@ class DatabaseManager {
             byCategory,
             topProducts
         };
+    }
+
+    // ==================== Supplier Management ====================
+
+    createSupplier(supplierData) {
+        const stmt = this.db.prepare(`
+            INSERT INTO suppliers (name, company, products_sold, contact_phone, shipping_methods, notes)
+            VALUES (?, ?, ?, ?, ?, ?)
+        `);
+        const result = stmt.run(
+            supplierData.name,
+            supplierData.company || null,
+            supplierData.products_sold || null,
+            supplierData.contact_phone || null,
+            supplierData.shipping_methods || null,
+            supplierData.notes || null
+        );
+        return { id: result.lastInsertRowid };
+    }
+
+    getSuppliers() {
+        return this.db.prepare('SELECT * FROM suppliers ORDER BY name').all();
+    }
+
+    searchSuppliers(query) {
+        return this.db.prepare(`
+            SELECT * FROM suppliers 
+            WHERE name LIKE ? OR company LIKE ? OR contact_phone LIKE ?
+            ORDER BY name
+            LIMIT 50
+        `).all(`%${query}%`, `%${query}%`, `%${query}%`);
+    }
+
+    updateSupplier(id, data) {
+        const stmt = this.db.prepare(`
+            UPDATE suppliers 
+            SET name = ?, company = ?, products_sold = ?, contact_phone = ?, 
+                shipping_methods = ?, notes = ?
+            WHERE id = ?
+        `);
+        stmt.run(
+            data.name,
+            data.company || null,
+            data.products_sold || null,
+            data.contact_phone || null,
+            data.shipping_methods || null,
+            data.notes || null,
+            id
+        );
+    }
+
+    deleteSupplier(id) {
+        this.db.prepare('DELETE FROM suppliers WHERE id = ?').run(id);
+    }
+
+    getSupplierById(id) {
+        return this.db.prepare('SELECT * FROM suppliers WHERE id = ?').get(id);
+    }
+
+    // ==================== Purchase Management ====================
+
+    createPurchase(purchaseData) {
+        const transaction = this.db.transaction((data) => {
+            // Insert purchase
+            const purchaseStmt = this.db.prepare(`
+                INSERT INTO purchases (supplier_id, description, total_amount, paid_amount, 
+                                      payment_status, due_date, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            `);
+            const result = purchaseStmt.run(
+                data.supplier_id,
+                data.description,
+                data.total_amount,
+                data.paid_amount || 0,
+                data.payment_status || 'pending',
+                data.due_date || null,
+                data.notes || null
+            );
+            const purchaseId = result.lastInsertRowid;
+
+            // Add to cash register as expense (only if paid something)
+            if (data.paid_amount && data.paid_amount > 0) {
+                const cashStmt = this.db.prepare(`
+                    INSERT INTO cash_register (type, amount, currency, payment_method, description, expense_category)
+                    VALUES ('expense', ?, ?, ?, ?, ?)
+                `);
+                cashStmt.run(
+                    data.paid_amount,  // Changed from data.total_amount to data.paid_amount
+                    data.currency || 'ARS',
+                    data.payment_method || 'cash_ars',
+                    `Compra #${purchaseId} - ${data.description}`,
+                    'supplier_purchase'
+                );
+            }
+
+            return purchaseId;
+        });
+
+        return transaction(purchaseData);
+    }
+
+    getPurchases(filters = {}) {
+        let query = `
+            SELECT p.*, s.name as supplier_name, s.company as supplier_company
+            FROM purchases p
+            JOIN suppliers s ON p.supplier_id = s.id
+            WHERE 1=1
+        `;
+        const params = [];
+
+        if (filters.supplier_id) {
+            query += ' AND p.supplier_id = ?';
+            params.push(filters.supplier_id);
+        }
+
+        if (filters.status) {
+            query += ' AND p.payment_status = ?';
+            params.push(filters.status);
+        }
+
+        query += ' ORDER BY p.purchase_date DESC';
+
+        return this.db.prepare(query).all(...params);
+    }
+
+    addPurchasePayment(purchaseId, paymentData) {
+        const transaction = this.db.transaction((pId, data) => {
+            // Insert payment record
+            const paymentStmt = this.db.prepare(`
+                INSERT INTO purchase_payments (purchase_id, amount, payment_method, notes)
+                VALUES (?, ?, ?, ?)
+            `);
+            paymentStmt.run(
+                pId,
+                data.amount,
+                data.payment_method || null,
+                data.notes || null
+            );
+
+            // Update purchase paid_amount and status
+            const purchase = this.db.prepare('SELECT total_amount, paid_amount FROM purchases WHERE id = ?').get(pId);
+            const newPaidAmount = purchase.paid_amount + data.amount;
+            let newStatus = 'pending';
+
+            if (newPaidAmount >= purchase.total_amount) {
+                newStatus = 'paid';
+            } else if (newPaidAmount > 0) {
+                newStatus = 'partial';
+            }
+
+            const updateStmt = this.db.prepare(`
+                UPDATE purchases 
+                SET paid_amount = ?, payment_status = ?
+                WHERE id = ?
+            `);
+            updateStmt.run(newPaidAmount, newStatus, pId);
+
+            // Add to cash register
+            const cashStmt = this.db.prepare(`
+                INSERT INTO cash_register (type, amount, currency, payment_method, description, expense_category)
+                VALUES ('expense', ?, ?, ?, ?, ?)
+            `);
+            cashStmt.run(
+                data.amount,
+                data.currency || 'ARS',
+                data.payment_method || 'cash_ars',
+                `Pago Compra #${pId}`,
+                'supplier_payment'
+            );
+        });
+
+        transaction(purchaseId, paymentData);
+    }
+
+    getPurchasePayments(purchaseId) {
+        return this.db.prepare(`
+            SELECT * FROM purchase_payments 
+            WHERE purchase_id = ? 
+            ORDER BY payment_date DESC
+        `).all(purchaseId);
+    }
+
+    getPurchaseById(id) {
+        return this.db.prepare(`
+            SELECT p.*, s.name as supplier_name, s.company as supplier_company
+            FROM purchases p
+            JOIN suppliers s ON p.supplier_id = s.id
+            WHERE p.id = ?
+        `).get(id);
+    }
+
+    // ==================== Cash Register Backup/Restore ====================
+
+    exportCashRegister() {
+        // Get all cash register entries
+        const entries = this.db.prepare('SELECT * FROM cash_register ORDER BY entry_date ASC').all();
+        return entries;
+    }
+
+    importCashRegister(entries, mode = 'append') {
+        const transaction = this.db.transaction((data, importMode) => {
+            if (importMode === 'replace') {
+                // Clear existing data
+                this.db.prepare('DELETE FROM cash_register').run();
+            }
+
+            // Insert entries
+            const stmt = this.db.prepare(`
+                INSERT INTO cash_register (entry_date, type, amount, currency, payment_method, description, expense_category, sale_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `);
+
+            for (const entry of data) {
+                stmt.run(
+                    entry.entry_date,
+                    entry.type,
+                    entry.amount,
+                    entry.currency,
+                    entry.payment_method || null,
+                    entry.description || null,
+                    entry.expense_category || null,
+                    entry.sale_id || null
+                );
+            }
+        });
+
+        transaction(entries, mode);
+    }
+
+
+
+    // ==================== Notes Management ====================
+
+    getNotes() {
+        return this.db.prepare('SELECT * FROM notes ORDER BY is_completed ASC, position_order DESC, created_at DESC').all();
+    }
+
+    createNote(noteData) {
+        const stmt = this.db.prepare(`
+            INSERT INTO notes (title, content, color, position_order)
+            VALUES (?, ?, ?, ?)
+        `);
+        // Get max position to put new note first
+        const maxPos = this.db.prepare('SELECT MAX(position_order) as max FROM notes').get().max || 0;
+
+        const result = stmt.run(
+            noteData.title,
+            noteData.content,
+            noteData.color || 'bg-yellow-200',
+            maxPos + 1
+        );
+        return result.lastInsertRowid;
+    }
+
+    updateNote(id, data) {
+        // Build dynamic update query
+        const fields = [];
+        const values = [];
+
+        if (data.title !== undefined) { fields.push('title = ?'); values.push(data.title); }
+        if (data.content !== undefined) { fields.push('content = ?'); values.push(data.content); }
+        if (data.color !== undefined) { fields.push('color = ?'); values.push(data.color); }
+        if (data.is_completed !== undefined) { fields.push('is_completed = ?'); values.push(data.is_completed ? 1 : 0); }
+        if (data.position_order !== undefined) { fields.push('position_order = ?'); values.push(data.position_order); }
+
+        if (fields.length === 0) return 0;
+
+        values.push(id);
+        const stmt = this.db.prepare(`UPDATE notes SET ${fields.join(', ')} WHERE id = ?`);
+        const result = stmt.run(...values);
+        return result.changes;
+    }
+
+    deleteNote(id) {
+        return this.db.prepare('DELETE FROM notes WHERE id = ?').run(id).changes;
     }
 
     close() {

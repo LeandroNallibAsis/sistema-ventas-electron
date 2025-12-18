@@ -59,4 +59,28 @@ contextBridge.exposeInMainWorld('api', {
     createClient: (clientData) => ipcRenderer.invoke('create-client', clientData),
     updateClient: (id, clientData) => ipcRenderer.invoke('update-client', id, clientData),
     deleteClient: (id) => ipcRenderer.invoke('delete-client', id),
+
+    // Supplier Management
+    getSuppliers: () => ipcRenderer.invoke('get-suppliers'),
+    searchSuppliers: (query) => ipcRenderer.invoke('search-suppliers', query),
+    createSupplier: (data) => ipcRenderer.invoke('create-supplier', data),
+    updateSupplier: (id, data) => ipcRenderer.invoke('update-supplier', id, data),
+    deleteSupplier: (id) => ipcRenderer.invoke('delete-supplier', id),
+
+    // Purchase Management
+    createPurchase: (data) => ipcRenderer.invoke('create-purchase', data),
+    getPurchases: (filters) => ipcRenderer.invoke('get-purchases', filters),
+    addPurchasePayment: (purchaseId, data) => ipcRenderer.invoke('add-purchase-payment', purchaseId, data),
+    getPurchasePayments: (purchaseId) => ipcRenderer.invoke('get-purchase-payments', purchaseId),
+    getPurchaseById: (id) => ipcRenderer.invoke('get-purchase-by-id', id),
+
+    // Cash Register Backup/Restore
+    exportCashRegister: () => ipcRenderer.invoke('export-cash-register'),
+    importCashRegister: (mode) => ipcRenderer.invoke('import-cash-register', mode),
+
+    // Notes Board
+    getNotes: () => ipcRenderer.invoke('get-notes'),
+    createNote: (data) => ipcRenderer.invoke('create-note', data),
+    updateNote: (id, data) => ipcRenderer.invoke('update-note', id, data),
+    deleteNote: (id) => ipcRenderer.invoke('delete-note', id),
 });

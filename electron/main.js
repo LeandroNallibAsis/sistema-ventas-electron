@@ -1,5 +1,7 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
+const fs = require('fs');
 const path = require('path');
+const XLSX = require('xlsx');
 const DatabaseManager = require('./database');
 
 let mainWindow;
@@ -341,6 +343,236 @@ function setupIPC() {
             return dbManager.deleteClient(id);
         } catch (error) {
             console.error('Error deleting client:', error);
+            throw error;
+        }
+    });
+
+    // Supplier Management (Phase 2)
+    ipcMain.handle('get-suppliers', async () => {
+        try {
+            return dbManager.getSuppliers();
+        } catch (error) {
+            console.error('Error getting suppliers:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('search-suppliers', async (event, query) => {
+        try {
+            return dbManager.searchSuppliers(query);
+        } catch (error) {
+            console.error('Error searching suppliers:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('create-supplier', async (event, data) => {
+        try {
+            return dbManager.createSupplier(data);
+        } catch (error) {
+            console.error('Error creating supplier:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('update-supplier', async (event, id, data) => {
+        try {
+            return dbManager.updateSupplier(id, data);
+        } catch (error) {
+            console.error('Error updating supplier:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('delete-supplier', async (event, id) => {
+        try {
+            return dbManager.deleteSupplier(id);
+        } catch (error) {
+            console.error('Error deleting supplier:', error);
+            throw error;
+        }
+    });
+
+    // Purchase Management (Phase 2)
+    ipcMain.handle('create-purchase', async (event, data) => {
+        try {
+            return dbManager.createPurchase(data);
+        } catch (error) {
+            console.error('Error creating purchase:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('get-purchases', async (event, filters) => {
+        try {
+            return dbManager.getPurchases(filters);
+        } catch (error) {
+            console.error('Error getting purchases:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('add-purchase-payment', async (event, purchaseId, data) => {
+        try {
+            return dbManager.addPurchasePayment(purchaseId, data);
+        } catch (error) {
+            console.error('Error adding purchase payment:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('get-purchase-payments', async (event, purchaseId) => {
+        try {
+            return dbManager.getPurchasePayments(purchaseId);
+        } catch (error) {
+            console.error('Error getting purchase payments:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('get-purchase-by-id', async (event, id) => {
+        try {
+            return dbManager.getPurchaseById(id);
+        } catch (error) {
+            console.error('Error getting purchase by id:', error);
+            throw error;
+        }
+    });
+
+    // Cash Register Backup/Restore
+    ipcMain.handle('export-cash-register', async () => {
+        try {
+            const data = dbManager.exportCashRegister();
+
+            // Show save dialog
+            const result = await dialog.showSaveDialog(mainWindow, {
+                title: 'Exportar Libro de Caja',
+                defaultPath: `caja_backup_${new Date().toISOString().split('T')[0]}.xlsx`,
+                filters: [
+                    { name: 'Excel', extensions: ['xlsx'] }
+                ]
+            });
+
+            if (!result.canceled && result.filePath) {
+                // Format data for Excel
+                const excelData = data.map(entry => ({
+                    'ID': entry.id,
+                    'Fecha': entry.entry_date,
+                    'Tipo': entry.type === 'income' ? 'INGRESO' : 'EGRESO',
+                    'Monto': entry.amount,
+                    'Moneda': entry.currency,
+                    'Método de Pago': entry.payment_method || '',
+                    'Descripción': entry.description || '',
+                    'Categoría': entry.expense_category || '',
+                    'ID Venta': entry.sale_id || ''
+                }));
+
+                // Create workbook
+                const ws = XLSX.utils.json_to_sheet(excelData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Libro de Caja');
+
+                // Auto-adjust column widths
+                const colWidths = [
+                    { wch: 6 },  // ID
+                    { wch: 20 }, // Fecha
+                    { wch: 10 }, // Tipo
+                    { wch: 12 }, // Monto
+                    { wch: 8 },  // Moneda
+                    { wch: 18 }, // Método
+                    { wch: 40 }, // Descripción
+                    { wch: 15 }, // Categoría
+                    { wch: 10 }  // ID Venta
+                ];
+                ws['!cols'] = colWidths;
+
+                // Write file
+                XLSX.writeFile(wb, result.filePath);
+                return { success: true, path: result.filePath };
+            }
+
+            return { success: false, canceled: true };
+        } catch (error) {
+            console.error('Error exporting cash register:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('import-cash-register', async (event, mode) => {
+        try {
+            // Show open dialog
+            const result = await dialog.showOpenDialog(mainWindow, {
+                title: 'Importar Libro de Caja',
+                filters: [
+                    { name: 'Excel', extensions: ['xlsx'] }
+                ],
+                properties: ['openFile']
+            });
+
+            if (!result.canceled && result.filePaths.length > 0) {
+                // Read Excel file
+                const workbook = XLSX.readFile(result.filePaths[0]);
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const excelData = XLSX.utils.sheet_to_json(worksheet);
+
+                // Convert Excel data back to database format
+                const data = excelData.map(row => ({
+                    entry_date: row['Fecha'],
+                    type: row['Tipo'] === 'INGRESO' ? 'income' : 'expense',
+                    amount: row['Monto'],
+                    currency: row['Moneda'],
+                    payment_method: row['Método de Pago'] || null,
+                    description: row['Descripción'] || null,
+                    expense_category: row['Categoría'] || null,
+                    sale_id: row['ID Venta'] || null
+                }));
+
+                // Import data
+                dbManager.importCashRegister(data, mode);
+
+                return { success: true, count: data.length };
+            }
+
+            return { success: false, canceled: true };
+        } catch (error) {
+            console.error('Error importing cash register:', error);
+            throw error;
+        }
+    });
+    // Notes Management
+    ipcMain.handle('get-notes', async () => {
+        try {
+            return dbManager.getNotes();
+        } catch (error) {
+            console.error('Error getting notes:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('create-note', async (event, note) => {
+        try {
+            return dbManager.createNote(note);
+        } catch (error) {
+            console.error('Error creating note:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('update-note', async (event, id, data) => {
+        try {
+            return dbManager.updateNote(id, data);
+        } catch (error) {
+            console.error('Error updating note:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('delete-note', async (event, id) => {
+        try {
+            return dbManager.deleteNote(id);
+        } catch (error) {
+            console.error('Error deleting note:', error);
             throw error;
         }
     });
