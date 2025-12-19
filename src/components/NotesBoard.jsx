@@ -21,7 +21,8 @@ const NotesBoard = () => {
     const [formData, setFormData] = useState({
         title: '',
         content: '',
-        color: 'bg-yellow-200'
+        color: 'bg-yellow-200',
+        reminder_date: ''
     });
 
     useEffect(() => {
@@ -45,14 +46,16 @@ const NotesBoard = () => {
             setFormData({
                 title: note.title || '',
                 content: note.content || '',
-                color: note.color || 'bg-yellow-200'
+                color: note.color || 'bg-yellow-200',
+                reminder_date: note.reminder_date || ''
             });
         } else {
             setEditingNote(null);
             setFormData({
                 title: '',
                 content: '',
-                color: 'bg-yellow-200'
+                color: 'bg-yellow-200',
+                reminder_date: ''
             });
         }
         setShowModal(true);
@@ -195,6 +198,11 @@ const NotesBoard = () => {
                                             <div className="flex-1 whitespace-pre-wrap font-handwriting text-md leading-snug">
                                                 {note.content}
                                             </div>
+                                            {note.reminder_date && (
+                                                <div className="mt-2 text-xs font-semibold text-gray-600 bg-white/50 p-1 rounded inline-block">
+                                                    ⏰ {new Date(note.reminder_date).toLocaleString()}
+                                                </div>
+                                            )}
 
                                             {/* Footer Actions */}
                                             <div className="flex justify-between items-end mt-4 pt-2 border-t border-black/5 opacity-0 group-hover:opacity-100 md:opacity-100 transition-opacity">
@@ -282,6 +290,16 @@ const NotesBoard = () => {
                                         onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                                         className={`input w-full h-40 resize-none ${formData.color} bg-opacity-30 border-gray-200`}
                                         placeholder="Escribe los detalles aquí..."
+                                    />
+                                </div>
+                                {/* Reminder Input */}
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Recordatorio (Opcional)</label>
+                                    <input
+                                        type="datetime-local"
+                                        value={formData.reminder_date}
+                                        onChange={(e) => setFormData({ ...formData, reminder_date: e.target.value })}
+                                        className="input w-full border-gray-200"
                                     />
                                 </div>
                             </div>

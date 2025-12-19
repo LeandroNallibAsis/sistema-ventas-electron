@@ -152,6 +152,18 @@ class DatabaseManager {
             console.error('Migration error (category_name):', error);
         }
 
+        // Migration: Add reminder_date to notes if it doesn't exist
+        try {
+            const columns = this.db.prepare("PRAGMA table_info(notes)").all();
+            const hasReminder = columns.some(col => col.name === 'reminder_date');
+            if (!hasReminder) {
+                this.db.exec('ALTER TABLE notes ADD COLUMN reminder_date DATETIME');
+                console.log('Migration: Added reminder_date column to notes');
+            }
+        } catch (error) {
+            console.error('Migration error (reminder_date):', error);
+        }
+
         // Store configuration table
         this.db.exec(`
       CREATE TABLE IF NOT EXISTS store_config (
@@ -251,6 +263,64 @@ class DatabaseManager {
                 FOREIGN KEY (purchase_id) REFERENCES purchases(id)
             )
         `);
+
+        // Quotes table (Presupuestos)
+        this.db.exec(`
+            CREATE TABLE IF NOT EXISTS quotes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_id INTEGER,
+                user_id INTEGER,
+                total_amount REAL NOT NULL,
+                status TEXT DEFAULT 'pending', -- pending, converted, expired
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                valid_until DATETIME,
+                notes TEXT,
+                FOREIGN KEY (client_id) REFERENCES clients(id),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        `);
+
+        this.db.exec(`
+            CREATE TABLE IF NOT EXISTS quote_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                quote_id INTEGER NOT NULL,
+                product_id INTEGER NOT NULL,
+                quantity INTEGER NOT NULL,
+                unit_price REAL NOT NULL,
+                subtotal REAL NOT NULL,
+                product_name TEXT, -- Snapshot of name
+                FOREIGN KEY (quote_id) REFERENCES quotes(id),
+                FOREIGN KEY (product_id) REFERENCES products(id)
+            )
+        `);
+
+        // Client Movements table (Current Account / Fiado)
+        this.db.exec(`
+            CREATE TABLE IF NOT EXISTS client_movements (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                client_id INTEGER NOT NULL,
+                type TEXT NOT NULL, -- 'debit' (purchase), 'credit' (payment)
+                amount REAL NOT NULL,
+                description TEXT,
+                reference_id INTEGER, -- sale_id or manual payment id (if trackable)
+                balance_after REAL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                user_id INTEGER,
+                FOREIGN KEY (client_id) REFERENCES clients(id)
+            )
+        `);
+
+        // Migration: Add current_account_balance to clients if not exists
+        try {
+            const columns = this.db.prepare("PRAGMA table_info(clients)").all();
+            const hasBalance = columns.some(col => col.name === 'current_account_balance');
+            if (!hasBalance) {
+                this.db.exec('ALTER TABLE clients ADD COLUMN current_account_balance REAL DEFAULT 0');
+                console.log('Migration: Added current_account_balance column to clients');
+            }
+        } catch (error) {
+            console.error('Migration error (current_account_balance):', error);
+        }
 
         // Notes table (Board Feature)
         this.db.exec(`
@@ -437,7 +507,9 @@ class DatabaseManager {
             { key: 'store_phone', value: '000-000-0000' },
             { key: 'store_logo', value: '' },
             { key: 'receipt_message', value: '¡Gracias por su compra!' },
-            { key: 'return_policy', value: 'Cambios y devoluciones dentro de los 30 días con ticket.' }
+            { key: 'return_policy', value: 'Cambios y devoluciones dentro de los 30 días con ticket.' },
+            { key: 'backup_enabled', value: 'false' },
+            { key: 'backup_path', value: '' }
         ];
 
         const checkStmt = this.db.prepare('SELECT COUNT(*) as count FROM store_config WHERE key = ?');
@@ -658,15 +730,35 @@ class DatabaseManager {
                 updateStock.run(item.quantity, item.product_id);
             }
 
-            // Add cash register entry
-            const description = `Venta #${saleId} - ${sale.payment_method} ${sale.client_id ? '(Cliente Registrado)' : ''}`;
-            insertCashEntry.run(
-                sale.total,
-                sale.currency,
-                sale.payment_method,
-                description,
-                saleId
-            );
+            // Add to Cash Register OR Current Account Debt
+            if (sale.payment_method === 'current_account') {
+                if (!sale.client_id) {
+                    throw new Error('Debe seleccionar un cliente para usar Cuenta Corriente/Fiado.');
+                }
+
+                // Register Debit (Debt Increase)
+                this.registerClientMovement({
+                    client_id: sale.client_id,
+                    type: 'debit',
+                    amount: sale.total,
+                    description: `Compra (Venta #${saleId})`,
+                    reference_id: saleId,
+                    user_id: null // TODO: Pass user_id if available, currently mostly implicit
+                }, true); // Use current transaction
+
+                // DO NOT INSERT INTO CASH REGISTER (Money didn't come in yet)
+
+            } else {
+                // Standard Cash Register Entry
+                const description = `Venta #${saleId} - ${sale.payment_method} ${sale.client_id ? '(Cliente Registrado)' : ''}`;
+                insertCashEntry.run(
+                    sale.total,
+                    sale.currency,
+                    sale.payment_method,
+                    description,
+                    saleId
+                );
+            }
 
             return saleId;
         });
@@ -1195,10 +1287,27 @@ class DatabaseManager {
         return this.db.prepare('SELECT * FROM notes ORDER BY is_completed ASC, position_order DESC, created_at DESC').all();
     }
 
+    getPendingReminders() {
+        const now = new Date();
+        const nowIso = now.toISOString(); // Assuming UTC storage or local compatible string
+        // If storing as YYYY-MM-DD HH:MM:SS local, we should match that.
+        // Electron JS Date.toISOString() is UTC.
+        // It's safer to rely on passed in ISO strings from frontend or standardize.
+        // But for simplicity, let's fetch ALL reminders that are not completed and let Logic filter,
+        // OR standard filter:
+
+        return this.db.prepare(`
+            SELECT * FROM notes 
+            WHERE is_completed = 0 
+            AND reminder_date IS NOT NULL 
+            AND reminder_date <= ?
+        `).all(nowIso);
+    }
+
     createNote(noteData) {
         const stmt = this.db.prepare(`
-            INSERT INTO notes (title, content, color, position_order)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO notes (title, content, color, position_order, reminder_date)
+            VALUES (?, ?, ?, ?, ?)
         `);
         // Get max position to put new note first
         const maxPos = this.db.prepare('SELECT MAX(position_order) as max FROM notes').get().max || 0;
@@ -1207,7 +1316,8 @@ class DatabaseManager {
             noteData.title,
             noteData.content,
             noteData.color || 'bg-yellow-200',
-            maxPos + 1
+            maxPos + 1,
+            noteData.reminder_date || null
         );
         return result.lastInsertRowid;
     }
@@ -1222,6 +1332,7 @@ class DatabaseManager {
         if (data.color !== undefined) { fields.push('color = ?'); values.push(data.color); }
         if (data.is_completed !== undefined) { fields.push('is_completed = ?'); values.push(data.is_completed ? 1 : 0); }
         if (data.position_order !== undefined) { fields.push('position_order = ?'); values.push(data.position_order); }
+        if (data.reminder_date !== undefined) { fields.push('reminder_date = ?'); values.push(data.reminder_date); }
 
         if (fields.length === 0) return 0;
 
@@ -1233,6 +1344,256 @@ class DatabaseManager {
 
     deleteNote(id) {
         return this.db.prepare('DELETE FROM notes WHERE id = ?').run(id).changes;
+    }
+
+    // ==========================================
+    // QUOTES (PRESUPUESTOS) MANAGEMENT
+    // ==========================================
+
+    createQuote(quoteData) {
+        const createTx = this.db.transaction((quote) => {
+            // 1. Create Quote Header
+            const stmt = this.db.prepare(`
+                INSERT INTO quotes (client_id, user_id, total_amount, valid_until, notes)
+                VALUES (?, ?, ?, ?, ?)
+            `);
+            const result = stmt.run(
+                quote.client_id || null,
+                quote.user_id || null,
+                quote.total,
+                quote.valid_until || null,
+                quote.notes || ''
+            );
+            const quoteId = result.lastInsertRowid;
+
+            // 2. Create Quote Items
+            const itemStmt = this.db.prepare(`
+                INSERT INTO quote_items (quote_id, product_id, quantity, unit_price, subtotal, product_name)
+                VALUES (?, ?, ?, ?, ?, ?)
+            `);
+
+            for (const item of quote.items) {
+                itemStmt.run(
+                    quoteId,
+                    item.id, // product_id
+                    item.quantity,
+                    item.price,
+                    item.price * item.quantity,
+                    item.name
+                );
+            }
+
+            return quoteId;
+        });
+
+        return createTx(quoteData);
+    }
+
+    getQuotes(filters = {}) {
+        let query = `
+            SELECT q.*, c.name as client_name, u.username as user_username,
+            (SELECT COUNT(*) FROM quote_items qi WHERE qi.quote_id = q.id) as item_count
+            FROM quotes q
+            LEFT JOIN clients c ON q.client_id = c.id
+            LEFT JOIN users u ON q.user_id = u.id
+            WHERE 1=1
+        `;
+        const params = [];
+
+        if (filters.status) {
+            query += ` AND q.status = ?`;
+            params.push(filters.status);
+        }
+
+        if (filters.search) {
+            query += ` AND (c.name LIKE ? OR q.id LIKE ?)`;
+            params.push(`%${filters.search}%`, `%${filters.search}%`);
+        }
+
+        query += ` ORDER BY q.created_at DESC`;
+
+        return this.db.prepare(query).all(...params);
+    }
+
+    getQuoteDetails(id) {
+        const quote = this.db.prepare(`
+            SELECT q.*, c.name as client_name, c.dni as client_dni, c.address as client_address
+            FROM quotes q
+            LEFT JOIN clients c ON q.client_id = c.id
+            WHERE q.id = ?
+        `).get(id);
+
+        if (!quote) return null;
+
+        const items = this.db.prepare(`
+            SELECT qi.*, p.barcode
+            FROM quote_items qi
+            LEFT JOIN products p ON qi.product_id = p.id
+            WHERE qi.quote_id = ?
+        `).all(id);
+
+        return { ...quote, items };
+    }
+
+    deleteQuote(id) {
+        const deleteTx = this.db.transaction(() => {
+            this.db.prepare('DELETE FROM quote_items WHERE quote_id = ?').run(id);
+            this.db.prepare('DELETE FROM quotes WHERE id = ?').run(id);
+        });
+        return deleteTx();
+    }
+
+    convertQuoteToSale(quoteId, paymentMethod) {
+        const convertTx = this.db.transaction(() => {
+            // 1. Get Quote Details
+            const quote = this.getQuoteDetails(quoteId);
+            if (!quote) throw new Error('Quote not found');
+            if (quote.status === 'converted') throw new Error('Quote already converted');
+
+            // 2. Prepare Sale Data (reuse createSale logic essentially, but manually here to link back)
+            // Or better: Call this.createSale inside? No, createSale is complex. Let's replicate logic but cleaner.
+
+            // Check stock first
+            for (const item of quote.items) {
+                const currentStock = this.db.prepare('SELECT stock FROM products WHERE id = ?').get(item.product_id).stock;
+                if (currentStock < item.quantity) {
+                    throw new Error(`Insufficient stock for product: ${item.product_name}`);
+                }
+            }
+
+            // Create Sale
+            const saleStmt = this.db.prepare(`
+                INSERT INTO sales (user_id, client_id, total, payment_method)
+                VALUES (?, ?, ?, ?)
+            `);
+            const saleResult = saleStmt.run(quote.user_id, quote.client_id, quote.total_amount, paymentMethod);
+            const saleId = saleResult.lastInsertRowid;
+
+            // Create Sale Items & Update Stock
+            const saleItemStmt = this.db.prepare(`
+                INSERT INTO sale_items (sale_id, product_id, quantity, price, subtotal)
+                VALUES (?, ?, ?, ?, ?)
+            `);
+            const updateStockStmt = this.db.prepare(`
+                UPDATE products SET stock = stock - ? WHERE id = ?
+            `);
+
+            for (const item of quote.items) {
+                saleItemStmt.run(saleId, item.product_id, item.quantity, item.unit_price, item.subtotal);
+                updateStockStmt.run(item.quantity, item.product_id);
+            }
+
+            // Register in Cash Register
+            this.db.prepare(`
+                INSERT INTO cash_register (type, amount, description, sale_id, payment_method)
+                VALUES ('income', ?, ?, ?, ?)
+            `).run(
+                quote.total_amount,
+                `Venta desde Presupuesto #${quote.id} - Venta #${saleId}`,
+                saleId,
+                paymentMethod
+            );
+
+            // 3. Update Quote Status
+            this.db.prepare('UPDATE quotes SET status = ?, notes = notes || ? WHERE id = ?')
+                .run('converted', `\nConverted to Sale #${saleId}`, quoteId);
+
+            return saleId;
+        });
+
+        return convertTx();
+    }
+
+    // ==========================================
+    // CURRENT ACCOUNT (FIADO) MANAGEMENT
+    // ==========================================
+
+    registerClientMovement(movement, tx = null) {
+        // movement: { client_id, type ('debit'/'credit'), amount, description, reference_id, user_id }
+        const logic = () => {
+            // 1. Get current balance
+            const client = this.db.prepare('SELECT current_account_balance FROM clients WHERE id = ?').get(movement.client_id);
+            if (!client) throw new Error('Client not found');
+
+            let currentBalance = client.current_account_balance || 0;
+            let newBalance = movement.type === 'debit'
+                ? currentBalance + movement.amount
+                : currentBalance - movement.amount;
+
+            // 2. Update Client Balance
+            this.db.prepare('UPDATE clients SET current_account_balance = ? WHERE id = ?')
+                .run(newBalance, movement.client_id);
+
+            // 3. Insert Movement Record
+            this.db.prepare(`
+                INSERT INTO client_movements (client_id, type, amount, description, reference_id, balance_after, user_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            `).run(
+                movement.client_id,
+                movement.type,
+                movement.amount,
+                movement.description,
+                movement.reference_id,
+                newBalance,
+                movement.user_id
+            );
+
+            return newBalance;
+        };
+
+        if (tx) return logic(); // Use existing transaction
+        const trans = this.db.transaction(logic);
+        return trans();
+    }
+
+    getClientMovements(clientId) {
+        return this.db.prepare(`
+            SELECT * FROM client_movements 
+            WHERE client_id = ? 
+            ORDER BY created_at DESC
+        `).all(clientId);
+    }
+
+    registerClientPayment(paymentData) {
+        // paymentData: { client_id, amount, payment_method, notes, user_id }
+        const payTx = this.db.transaction(() => {
+            // 1. Register Credit Movement (Decreases Debt)
+            this.registerClientMovement({
+                client_id: paymentData.client_id,
+                type: 'credit',
+                amount: paymentData.amount,
+                description: `Pago a Cuenta (${paymentData.payment_method}) - ${paymentData.notes || ''}`,
+                reference_id: null,
+                user_id: paymentData.user_id
+            }, true); // Pass true to indicate we are inside a transaction
+
+            // 2. Register Incoming Cash (Since they are paying now)
+            this.db.prepare(`
+                INSERT INTO cash_register (type, amount, description, payment_method)
+                VALUES ('income', ?, ?, ?)
+            `).run(
+                paymentData.amount,
+                `Cobro Deuda Cliente #${paymentData.client_id}`,
+                paymentData.payment_method
+            );
+        });
+
+        return payTx();
+    }
+
+    getStoreConfig() {
+        const configs = this.db.prepare('SELECT key, value FROM store_config').all();
+        const configMap = {};
+        configs.forEach(c => {
+            configMap[c.key] = c.value;
+        });
+        return configMap;
+    }
+
+    updateStoreConfig(key, value) {
+        const stmt = this.db.prepare('UPDATE store_config SET value = ? WHERE key = ?');
+        const result = stmt.run(value, key);
+        return result.changes;
     }
 
     close() {

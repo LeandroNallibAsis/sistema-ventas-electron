@@ -83,4 +83,19 @@ contextBridge.exposeInMainWorld('api', {
     createNote: (data) => ipcRenderer.invoke('create-note', data),
     updateNote: (id, data) => ipcRenderer.invoke('update-note', id, data),
     deleteNote: (id) => ipcRenderer.invoke('delete-note', id),
+    getPendingReminders: () => ipcRenderer.invoke('get-pending-reminders'),
+
+    // Quotes (Presupuestos)
+    getQuotes: (filters) => ipcRenderer.invoke('get-quotes', filters),
+    createQuote: (data) => ipcRenderer.invoke('create-quote', data),
+    getQuoteDetails: (id) => ipcRenderer.invoke('get-quote-details', id),
+    deleteQuote: (id) => ipcRenderer.invoke('delete-quote', id),
+    convertQuoteToSale: (id, paymentMethod) => ipcRenderer.invoke('convert-quote-to-sale', id, paymentMethod),
+
+    // Client Current Account (Fiado)
+    getClientMovements: (clientId) => ipcRenderer.invoke('get-client-movements', clientId),
+    registerClientPayment: (data) => ipcRenderer.invoke('register-client-payment', data),
+
+    // System
+    selectDirectory: () => ipcRenderer.invoke('select-directory'),
 });

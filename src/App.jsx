@@ -17,10 +17,13 @@ import ClientManagement from './components/ClientManagement';
 import SupplierManagement from './components/SupplierManagement';
 import PurchaseManagement from './components/PurchaseManagement';
 import NotesBoard from './components/NotesBoard';
+import QuotesManager from './components/QuotesManager';
+import JsBarcode from 'jsbarcode';
+import { generateBulkPrintHTML } from './utils/barcodePrinter';
 
 function App() {
   const [user, setUser] = useState(null); // { id, username, role, name }
-  const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard', 'inventory', 'pos', 'sales', 'cash', 'reports', 'settings', 'users', 'clients', 'suppliers', 'purchases'
+  const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard', 'inventory', 'pos', 'sales', 'cash', 'reports', 'settings', 'users', 'clients', 'suppliers', 'purchases', 'quotes'
 
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -28,6 +31,64 @@ function App() {
   const [showProductForm, setShowProductForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [showBarcode, setShowBarcode] = useState(null);
+  const [notifications, setNotifications] = useState([]); // { id, title, message, type: 'warning'|'info'|'success'|'error', duration }
+  const notifiedNotesRef = React.useRef(new Set());
+
+  // Notification Helper
+  const addNotification = (title, message, type = 'info', duration = 5000) => {
+    const id = Date.now() + Math.random();
+    setNotifications(prev => [...prev, { id, title, message, type, duration }]);
+
+    if (duration > 0) {
+      setTimeout(() => {
+        removeNotification(id);
+      }, duration);
+    }
+  };
+
+  const removeNotification = (id) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  };
+
+
+  // Alerts & Reminders Check
+  useEffect(() => {
+    if (!user) return;
+
+    const checkAlerts = async () => {
+      try {
+        // 1. Check Reminders
+        const reminders = await window.api.getPendingReminders();
+        reminders.forEach(note => {
+          if (!notifiedNotesRef.current.has(note.id)) {
+            addNotification('Recordatorio 📌', note.title, 'info', 10000);
+            notifiedNotesRef.current.add(note.id);
+          }
+        });
+
+        // 2. Check Low Stock (Only on startup)
+        // We can check if we just loaded
+      } catch (error) {
+        console.error("Error checking alerts", error);
+      }
+    };
+
+    const checkLowStock = async () => {
+      try {
+        const stats = await window.api.getDashboardStats();
+        if (stats.lowStock && stats.lowStock.length > 0) {
+          addNotification('Stock Bajo ⚠️', `Hay ${stats.lowStock.length} productos con stock bajo.`, 'warning', 10000);
+        }
+      } catch (e) { console.error(e) }
+    };
+
+    checkAlerts(); // Immediate check on mount/login
+    checkLowStock();
+
+    const interval = setInterval(checkAlerts, 60000); // Check every minute
+    return () => clearInterval(interval);
+
+  }, [user]);
 
   // Load categories on mount
   useEffect(() => {
@@ -149,10 +210,42 @@ function App() {
     setCurrentView('dashboard');
   };
 
+  const handlePrintBulkLabels = () => {
+    if (!products || products.length === 0) {
+      alert('No hay productos para imprimir');
+      return;
+    }
+
+    const tempCanvas = document.createElement('canvas');
+    const productsWithImages = products.map(p => {
+      try {
+        JsBarcode(tempCanvas, String(p.id).padStart(8, '0'), {
+          format: 'CODE128',
+          width: 2,
+          height: 60,
+          displayValue: true
+        });
+        return {
+          name: p.name,
+          price: p.price,
+          barcodeImage: tempCanvas.toDataURL('image/png')
+        };
+      } catch (error) {
+        console.error('Error generating barcode for product:', p.name, error);
+        return null;
+      }
+    }).filter(p => p !== null);
+
+    const htmlContent = generateBulkPrintHTML(productsWithImages);
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
   // Helper for determining visibility
   const canShow = (view) => {
     if (user?.role === 'admin') return true;
-    if (user?.role === 'seller') return ['pos', 'sales', 'clients'].includes(view);
+    if (user?.role === 'seller') return ['pos', 'sales', 'clients', 'notes', 'quotes'].includes(view);
     return false;
   };
 
@@ -160,10 +253,8 @@ function App() {
   const renderContent = () => {
     // Security check for views
     if (user?.role === 'seller') {
-      if (user?.role === 'seller') {
-        if (!['pos', 'sales', 'clients', 'notes'].includes(currentView)) { // Allow clients for seller
-          return <div className="p-8">Acceso no autorizado</div>;
-        }
+      if (!['pos', 'sales', 'clients', 'notes', 'quotes'].includes(currentView)) { // Allow clients for seller
+        return <div className="p-8">Acceso no autorizado</div>;
       }
     }
 
@@ -195,6 +286,9 @@ function App() {
       case 'notes':
         return <NotesBoard />;
 
+      case 'quotes':
+        return <QuotesManager />;
+
       case 'inventory':
       default:
         return (
@@ -223,12 +317,21 @@ function App() {
                     </p>
                   </div>
                   {selectedCategory && user?.role === 'admin' && (
-                    <button
-                      onClick={handleAddProduct}
-                      className="btn btn-primary"
-                    >
-                      + Agregar Producto
-                    </button>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={handlePrintBulkLabels}
+                        className="btn btn-secondary flex items-center gap-2"
+                        title="Imprimir etiquetas de todos los productos de esta categoría"
+                      >
+                        🏷️ Imprimir Etiquetas
+                      </button>
+                      <button
+                        onClick={handleAddProduct}
+                        className="btn btn-primary"
+                      >
+                        + Agregar Producto
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -248,34 +351,13 @@ function App() {
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full text-gray-400">
                     <svg className="w-32 h-32 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                     </svg>
-                    <p className="text-xl font-medium">Bienvenido a ElectroStock</p>
-                    <p className="text-sm mt-2">Crea una categoría para comenzar</p>
+                    <p className="text-xl">Selecciona una categoría del panel izquierdo</p>
                   </div>
                 )}
               </div>
             </div>
-
-            {/* Modals */}
-            {showProductForm && (
-              <ProductForm
-                product={editingProduct}
-                categoryId={selectedCategory?.id}
-                onSubmit={editingProduct ? handleUpdateProduct : handleCreateProduct}
-                onCancel={() => {
-                  setShowProductForm(false);
-                  setEditingProduct(null);
-                }}
-              />
-            )}
-
-            {showBarcode && (
-              <BarcodeModal
-                product={showBarcode}
-                onClose={() => setShowBarcode(null)}
-              />
-            )}
           </div>
         );
     }
@@ -286,133 +368,105 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
-      {/* Navigation Sidebar */}
-      <div className="w-64 bg-gray-900 text-white flex flex-col">
-        <div className="p-6 border-b border-gray-800">
-          <h1 className="text-2xl font-bold">ElectroStock</h1>
-          <p className="text-sm text-gray-400 mt-1">
-            {user.username} ({user.role === 'admin' ? 'Admin' : 'Vendedor'})
-          </p>
+    <div className="flex bg-gray-100 font-sans text-gray-900">
+      {/* Sidebar Navigation */}
+      <nav className="bg-gray-900 w-64 flex flex-col py-6 gap-2 shadow-xl z-50 items-start">
+        <div className="flex items-center justify-start gap-3 w-full px-6 mb-6">
+          <div className="w-10 h-10 bg-blue-600 rounded-lg flex-shrink-0 flex items-center justify-center shadow-lg shadow-blue-900/50">
+            <span className="text-white font-bold text-lg">ES</span>
+          </div>
+          <span className="text-white font-bold text-xl whitespace-nowrap">ElectroStock</span>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2">
-          {canShow('dashboard') && (
-            <button
-              onClick={() => setCurrentView('dashboard')}
-              className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${currentView === 'dashboard' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
-            >
-              🏠 Inicio
-            </button>
-          )}
-
-          {canShow('inventory') && (
-            <button
-              onClick={() => setCurrentView('inventory')}
-              className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${currentView === 'inventory' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
-            >
-              📦 Inventario
-            </button>
-          )}
-
+        {[
+          { id: 'dashboard', icon: '📊', label: 'Panel Principal', show: true },
+          { id: 'inventory', icon: '📦', label: 'Inventario', show: true },
+          { id: 'pos', icon: '🛒', label: 'Punto de Venta', show: canShow('pos') },
+          { id: 'sales', icon: '📜', label: 'Historial Ventas', show: canShow('sales') },
+          { id: 'cash', icon: '💵', label: 'Caja Diaria', show: canShow('cash') },
+          { id: 'clients', icon: '👥', label: 'Clientes', show: canShow('clients') },
+          { id: 'quotes', icon: '📋', label: 'Presupuestos', show: canShow('quotes') },
+          { id: 'suppliers', icon: '🚚', label: 'Proveedores', show: canShow('suppliers') },
+          { id: 'purchases', icon: '🛍️', label: 'Compras', show: canShow('purchases') },
+          { id: 'notes', icon: '📌', label: 'Pizarra de Notas', show: canShow('notes') },
+          { id: 'reports', icon: '📈', label: 'Reportes', show: canShow('reports') },
+          { id: 'users', icon: '🔐', label: 'Usuarios', show: canShow('users') },
+          { id: 'settings', icon: '⚙️', label: 'Configuración', show: canShow('settings') },
+        ].map(item => item.show && (
           <button
-            onClick={() => setCurrentView('pos')}
-            className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${currentView === 'pos' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
+            key={item.id}
+            onClick={() => setCurrentView(item.id)}
+            className={`
+              relative flex items-center h-12 rounded-xl transition-all duration-200 mx-3 group w-[calc(100%-1.5rem)] px-4
+              ${currentView === item.id
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
+                : 'text-gray-400 hover:bg-gray-800 hover:text-white'}
+            `}
           >
-            💰 Punto de Venta
+            <span className="text-xl flex-shrink-0">{item.icon}</span>
+            <span className="ml-3 font-medium whitespace-nowrap overflow-hidden">
+              {item.label}
+            </span>
           </button>
+        ))}
 
-          <button
-            onClick={() => setCurrentView('sales')}
-            className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${currentView === 'sales' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
-          >
-            📊 Historial de Ventas
-          </button>
-
-          {canShow('clients') && (
-            <button
-              onClick={() => setCurrentView('clients')}
-              className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${currentView === 'clients' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
-            >
-              👥 Clientes
-            </button>
-          )}
-
-          {canShow('suppliers') && (
-            <button
-              onClick={() => setCurrentView('suppliers')}
-              className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${currentView === 'suppliers' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
-            >
-              📦 Proveedores
-            </button>
-          )}
-
-          {canShow('purchases') && (
-            <button
-              onClick={() => setCurrentView('purchases')}
-              className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${currentView === 'purchases' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
-            >
-              🛒 Compras
-            </button>
-          )}
-
-          <button
-            onClick={() => setCurrentView('notes')}
-            className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${currentView === 'notes' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
-          >
-            📌 Pizarra de Notas
-          </button>
-
-          {canShow('cash') && (
-            <button
-              onClick={() => setCurrentView('cash')}
-              className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${currentView === 'cash' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
-            >
-              💵 Libro de Caja
-            </button>
-          )}
-
-          {canShow('reports') && (
-            <button
-              onClick={() => setCurrentView('reports')}
-              className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${currentView === 'reports' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
-            >
-              📈 Reportes Mensuales
-            </button>
-          )}
-
-          {user.role === 'admin' && (
-            <>
-              <button
-                onClick={() => setCurrentView('users')}
-                className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${currentView === 'users' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
-              >
-                👥 Usuarios
-              </button>
-
-              <button
-                onClick={() => setCurrentView('settings')}
-                className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${currentView === 'settings' ? 'bg-primary-600 text-white' : 'text-gray-300 hover:bg-gray-800'}`}
-              >
-                ⚙️ Configuración
-              </button>
-            </>
-          )}
-        </nav>
-
-        <div className="p-4 border-t border-gray-800">
+        <div className="mt-auto w-full px-3">
           <button
             onClick={handleLogout}
-            className="w-full bg-red-600 hover:bg-red-700 text-white text-sm font-bold py-2 px-4 rounded transition-colors flex items-center justify-center gap-2"
+            className="flex items-center h-12 rounded-xl transition-all duration-200 w-full group text-gray-400 hover:bg-red-900/20 hover:text-red-500 px-4"
+            title="Cerrar Sesión"
           >
-            ↪️ Cerrar Sesión
+            <span className="text-xl flex-shrink-0">🚪</span>
+            <span className="ml-3 font-medium whitespace-nowrap overflow-hidden">
+              Cerrar Sesión
+            </span>
           </button>
         </div>
-      </div>
+      </nav>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-hidden">
+      <main className="flex-1 overflow-hidden relative">
         {renderContent()}
+
+        {/* Modals outside router (if any global) */}
+        {showProductForm && (
+          <ProductForm
+            onSubmit={editingProduct ? handleUpdateProduct : handleCreateProduct}
+            onCancel={() => { setShowProductForm(false); setEditingProduct(null); }}
+            initialData={editingProduct}
+            categories={categories}
+            selectedCategoryId={selectedCategory?.id}
+          />
+        )}
+
+        {showBarcode && (
+          <BarcodeModal
+            product={showBarcode}
+            onClose={() => setShowBarcode(null)}
+          />
+        )}
+      </main>
+
+      {/* Notifications Toast Container */}
+      <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
+        {notifications.map(n => (
+          <div
+            key={n.id}
+            className={`
+              pointer-events-auto p-4 rounded-lg shadow-lg max-w-sm border-l-4 animate-slide-in
+              ${n.type === 'warning' ? 'bg-orange-50 border-orange-500 text-orange-800' :
+                n.type === 'error' ? 'bg-red-50 border-red-500 text-red-800' :
+                  n.type === 'success' ? 'bg-green-50 border-green-500 text-green-800' :
+                    'bg-blue-50 border-blue-500 text-blue-800'}
+            `}
+          >
+            <div className="flex justify-between items-start">
+              <h4 className="font-bold text-sm mb-1">{n.title}</h4>
+              <button onClick={() => removeNotification(n.id)} className="text-gray-400 hover:text-gray-600 ml-2">×</button>
+            </div>
+            <p className="text-sm opacity-90">{n.message}</p>
+          </div>
+        ))}
       </div>
     </div>
   );

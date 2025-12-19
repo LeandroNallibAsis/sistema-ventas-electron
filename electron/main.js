@@ -576,7 +576,117 @@ function setupIPC() {
             throw error;
         }
     });
+
+    ipcMain.handle('get-pending-reminders', async () => {
+        try {
+            return dbManager.getPendingReminders();
+        } catch (error) {
+            console.error('Error getting pending reminders:', error);
+            return [];
+        }
+    });
+
+    // Quotes Management
+    ipcMain.handle('get-quotes', async (event, filters) => {
+        try {
+            return dbManager.getQuotes(filters);
+        } catch (error) {
+            console.error('Error getting quotes:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('create-quote', async (event, quote) => {
+        try {
+            return dbManager.createQuote(quote);
+        } catch (error) {
+            console.error('Error creating quote:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('get-quote-details', async (event, id) => {
+        try {
+            return dbManager.getQuoteDetails(id);
+        } catch (error) {
+            console.error('Error getting quote details:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('delete-quote', async (event, id) => {
+        try {
+            return dbManager.deleteQuote(id);
+        } catch (error) {
+            console.error('Error deleting quote:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('convert-quote-to-sale', async (event, id, paymentMethod) => {
+        try {
+            return dbManager.convertQuoteToSale(id, paymentMethod);
+        } catch (error) {
+            console.error('Error converting quote to sale:', error);
+            throw error;
+        }
+    });
+
+    // Client Current Account (Fiado)
+    ipcMain.handle('get-client-movements', async (event, clientId) => {
+        try {
+            return dbManager.getClientMovements(clientId);
+        } catch (error) {
+            console.error('Error getting client movements:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('register-client-payment', async (event, paymentData) => {
+        try {
+            return dbManager.registerClientPayment(paymentData);
+        } catch (error) {
+            console.error('Error registering client payment:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('select-directory', async () => {
+        const result = await dialog.showOpenDialog(mainWindow, {
+            properties: ['openDirectory']
+        });
+        if (result.canceled) {
+            return null;
+        } else {
+            return result.filePaths[0];
+        }
+    });
 }
+
+const performBackup = async () => {
+    if (!dbManager) return;
+
+    try {
+        const config = dbManager.getStoreConfig();
+        if (config.backup_enabled === 'true' && config.backup_path) {
+            const dbPath = path.join(app.getPath('userData'), 'database.sqlite');
+            if (fs.existsSync(dbPath)) {
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').split('.')[0];
+                const backupFile = `electrostock_backup_${timestamp}.sqlite`;
+                const destination = path.join(config.backup_path, backupFile);
+
+                if (!fs.existsSync(config.backup_path)) {
+                    fs.mkdirSync(config.backup_path, { recursive: true });
+                }
+
+                fs.copyFileSync(dbPath, destination);
+                console.log(`Automatic backup successful: ${destination}`);
+            }
+        }
+    } catch (error) {
+        console.error('Error performing automatic backup:', error);
+    }
+};
 
 app.whenReady().then(() => {
     // Initialize database
@@ -596,8 +706,9 @@ app.whenReady().then(() => {
     });
 });
 
-app.on('window-all-closed', () => {
+app.on('window-all-closed', async () => {
     if (process.platform !== 'darwin') {
+        await performBackup();
         if (dbManager) {
             dbManager.close();
         }
@@ -605,7 +716,8 @@ app.on('window-all-closed', () => {
     }
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', async () => {
+    await performBackup();
     if (dbManager) {
         dbManager.close();
     }

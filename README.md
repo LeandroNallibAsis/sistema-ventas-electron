@@ -1,89 +1,86 @@
-# 📦 ElectroStock - Sistema de Gestión de Stock Offline
+# 📦 ElectroStock - Sistema Integral de Gestión y Ventas
 
-**Sistema completo de gestión de inventario 100% offline para Windows**
-
----
-
-## 🎯 Características
-
-✨ **100% Offline** - No requiere conexión a internet  
-📊 **Gestión Completa** - Categorías, productos, stock  
-🏷️ **Códigos de Barras** - Genera y descarga códigos en PNG  
-🚦 **Alertas de Stock** - Visual: Disponible, Poco Stock, Sin Stock  
-💾 **Base de Datos Local** - SQLite persistente  
-🎨 **Interfaz Moderna** - TailwindCSS con diseño profesional  
+**Software profesional de punto de venta (POS) e inventario 100% offline para Windows.**
 
 ---
 
-## 🚀 Instalación Rápida
+## 🎯 Módulos Principales
 
-```bash
-# 1. Instalar dependencias (solo la primera vez)
-npm install
+### 🛒 Punto de Venta (POS)
+- **Ventas Rápidas**: Interfaz ágil para búsqueda por nombre o código de barras.
+- **Múltiples Métodos de Pago**: Efectivo (ARS/USD), Transferencia, QR, Débito y Crédito.
+- **Gestión de Recargos**: Configuración personalizada de intereses por método de pago.
+- **Tickets Profesionales**: Generación de tickets de venta con logo y mensajes personalizados (PDF/Impresión).
 
-# 2. Ejecutar la aplicación
-npm run dev
-```
+### � Gestión de Inventario
+- **Control Total**: Categorización de productos, precios de costo y venta.
+- **Control de Stock**: Alertas visuales y analíticas de niveles de stock.
+- **Códigos de Barras**: Generación individual y **impresión masiva por lote** (etiquetas de 60mm x 40mm).
+
+### 👥 Clientes y Cuenta Corriente (Fiado)
+- **Base de Datos de Clientes**: Registro completo de datos de contacto.
+- **Cuenta Corriente**: Seguimiento detallado de deudas, entregas de dinero y movimientos históricos.
+- **Saldos en Tiempo Real**: Visualización inmediata de la deuda total de cada cliente.
+
+### 📝 Notas y Recordatorios
+- **Tablero Kanban**: Gestión de notas con colores y estados.
+- **Recordatorios Inteligentes**: Configuración de alarmas con **notificaciones de escritorio** automáticas al llegar la fecha programada.
+
+### 💰 Caja y Finanzas
+- **Control de Caja Diaria**: Entradas y salidas manuales de dinero.
+- **Gastos y Compras**: Registro de compras a proveedores y gastos fijos del local.
+- **Reportes Mensuales**: Análisis financiero detallado con Ingresos, Gastos y Ganancia Neta.
+
+### 📑 Presupuestos
+- **Creación de Cotizaciones**: Generación de presupuestos formales para clientes.
+- **Conversión Directa**: Convierte un presupuesto en una venta real con un solo clic, descontando stock automáticamente.
 
 ---
 
-## 💻 Uso Básico
+## ✨ Características Destacadas
 
-### 1. Crear Categorías
-Haz clic en **+** en el sidebar → Ingresa nombre → **Crear**
-
-### 2. Agregar Productos
-Selecciona categoría → **+ Agregar Producto** → Completa formulario
-
-### 3. Códigos de Barras
-Haz clic en 📊 junto al producto → **🖨️ Descargar PNG**
-
----
-
-## 📚 Documentación
-
-- **[INSTALACION.md](./INSTALACION.md)** - Guía completa de instalación
-- **[walkthrough.md](../.gemini/antigravity/brain/*/walkthrough.md)** - Documentación técnica
+- � **100% Offline**: Privacidad total y funcionamiento sin internet.
+- 📂 **Copia de Seguridad Automática**: Respaldo automático de toda la base de datos al cerrar el programa en la carpeta que elijas (Dropbox, Drive, etc.).
+- 🚦 **Sistema de Alertas**: Notificaciones persistentes para stock bajo y tareas pendientes.
+- 🔐 **Control de Accesos**: Roles diferenciados para **Admin** (acceso total) y **Vendedor** (solo POS y gestión operativa).
 
 ---
 
 ## 🛠️ Stack Tecnológico
 
-- **Electron 39** - Aplicación de escritorio
-- **React 19** - UI moderna
-- **Vite 7** - Build ultrarrápido
-- **TailwindCSS 3** - Estilos profesionales
-- **SQLite** - Base de datos local
-- **jsbarcode** - Códigos de barras
+- **Frontend**: React 19 + TailwindCSS 3
+- **Backend/Desktop**: Electron 39
+- **Base de Datos**: SQLite (Better-SQLite3)
+- **Reportes/Excel**: XLSX (SheetJS)
+- **Código de Barras**: JsBarcode
 
 ---
 
-## ⚙️ Scripts
+## 🚀 Instalación y Desarrollo
 
 ```bash
-npm run dev      # Modo desarrollo
-npm run build    # Build producción
-npm run dist     # Crear .exe Windows
+# Instalar dependencias
+npm install
+
+# Iniciar en modo desarrollo
+npm run dev
+
+# Generar instalador para Windows (.exe)
+npm run dist
 ```
 
 ---
 
-## 📊 Sistema de Alertas
+## 📊 Configuración de Alertas
 
-| Badge | Stock |
+| Estado | Condición |
 |-------|-------|
-| 🟢 **Disponible** | > 10 unidades |
-| 🟡 **Poco Stock** | 1-10 unidades |
-| 🔴 **Sin Stock** | 0 unidades |
+| 🟢 **Disponible** | Stock > 10 |
+| 🟡 **Poco Stock** | Stock entre 1 y 10 |
+| 🔴 **Sin Stock** | Stock = 0 |
+| ⚠️ **Alerta Global** | Notificación en Dashboard si hay más de 5 items bajos |
 
 ---
 
-## 📁 Base de Datos
+**ElectroStock: Potenciando tu negocio con simplicidad y control.**
 
-```
-C:\Users\[Usuario]\AppData\Roaming\electro-stock\electrostock.db
-```
-
----
-
-**Hecho con ❤️ para pequeños y medianos negocios**

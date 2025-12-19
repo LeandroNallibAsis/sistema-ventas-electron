@@ -45,8 +45,12 @@ const POSScreen = () => {
         'credit_3': 'Crédito 3 cuotas',
         'credit_6': 'Crédito 6 cuotas',
         'credit_12': 'Crédito 12 cuotas',
-        'link': 'Link de Pago'
+        'link': 'Link de Pago',
+        'current_account': 'Cuenta Corriente (Fiado)'
     };
+
+
+
 
     useEffect(() => {
         loadPaymentConfigs();
@@ -235,6 +239,11 @@ const POSScreen = () => {
     const handleCompleteSale = async () => {
         if (cart.length === 0) {
             setError('El carrito está vacío');
+            return;
+        }
+
+        if (paymentMethod === 'current_account' && !selectedClient) {
+            setError('Debe seleccionar un cliente para usar Cuenta Corriente/Fiado');
             return;
         }
 
@@ -445,7 +454,14 @@ const POSScreen = () => {
                                 {paymentLabels[config.method] || config.method} {getSurchargePercent(config.method, paymentConfigs) > 0 ? `(+${getSurchargePercent(config.method, paymentConfigs)}%)` : ''}
                             </option>
                         ))}
+                        <option value="current_account">⏱️ Cuenta Corriente (Fiado)</option>
                     </select>
+                    {paymentMethod === 'current_account' && !selectedClient && (
+                        <div className="mt-2 text-red-600 text-sm bg-red-50 p-2 rounded border border-red-100 flex items-center gap-2">
+                            <span>⚠️</span>
+                            Necesitas seleccionar un CLIENTE para usar Cuenta Corriente.
+                        </div>
+                    )}
                 </div>
 
                 {/* Warranty Options */}

@@ -10,7 +10,9 @@ const SettingsScreen = () => {
         store_phone: '',
         store_logo: '',
         receipt_message: '',
-        return_policy: ''
+        return_policy: '',
+        backup_enabled: 'false',
+        backup_path: ''
     });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
