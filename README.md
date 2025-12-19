@@ -12,7 +12,7 @@
 - **Gestión de Recargos**: Configuración personalizada de intereses por método de pago.
 - **Tickets Profesionales**: Generación de tickets de venta con logo y mensajes personalizados (PDF/Impresión).
 
-### � Gestión de Inventario
+### 📦 Gestión de Inventario
 - **Control Total**: Categorización de productos, precios de costo y venta.
 - **Control de Stock**: Alertas visuales y analíticas de niveles de stock.
 - **Códigos de Barras**: Generación individual y **impresión masiva por lote** (etiquetas de 60mm x 40mm).
@@ -39,10 +39,35 @@
 
 ## ✨ Características Destacadas
 
-- � **100% Offline**: Privacidad total y funcionamiento sin internet.
+- 📶 **100% Offline**: Privacidad total y funcionamiento sin internet.
 - 📂 **Copia de Seguridad Automática**: Respaldo automático de toda la base de datos al cerrar el programa en la carpeta que elijas (Dropbox, Drive, etc.).
 - 🚦 **Sistema de Alertas**: Notificaciones persistentes para stock bajo y tareas pendientes.
 - 🔐 **Control de Accesos**: Roles diferenciados para **Admin** (acceso total) y **Vendedor** (solo POS y gestión operativa).
+
+---
+
+## 📚 Documentación Incluida
+
+### Gestión de Proyecto
+- Acta de Constitución  
+- Plan de Proyecto  
+- Registro de Interesados  
+- Registro de Riesgos  
+- Lecciones Aprendidas  
+
+### Requerimientos
+- Documento SRS  
+- Historias de Usuario / Casos de Uso  
+- Diagramas UML / Flujos  
+- Modelo de Datos (ERD)
+
+### Diseño de Software
+- Arquitectura (SAD)  
+- Diseño UI/UX  
+
+### Manuales Técnicos
+- Instalación  
+- Configuración  
 
 ---
 
@@ -83,4 +108,3 @@ npm run dist
 ---
 
 **ElectroStock: Potenciando tu negocio con simplicidad y control.**
-
