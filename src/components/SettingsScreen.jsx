@@ -257,7 +257,7 @@ const SettingsScreen = () => {
                                     onChange={(e) => handleStoreChange('return_policy', e.target.value)}
                                     className="input"
                                     rows="2"
-                                    placeholder="Cambios y devoluciones dentro de los 30 días..."
+                                    placeholder="Cambios y devoluciones dentro de los 30 días con ticket."
                                 />
                             </div>
 
@@ -279,21 +279,80 @@ const SettingsScreen = () => {
                         </div>
                     </div>
 
-                    {/* Receipt Preview */}
-                    <div className="card p-6">
-                        <h2 className="text-xl font-semibold text-gray-900 mb-4">🧾 Vista Previa del Ticket</h2>
-                        <div className="border rounded-lg overflow-hidden bg-gray-100 p-4 flex justify-center overflow-x-auto">
-                            <TicketView
-                                storeConfig={{
-                                    name: storeConfig.store_name,
-                                    address: storeConfig.store_address,
-                                    phone: storeConfig.store_phone,
-                                    logo: storeConfig.store_logo,
-                                    message: storeConfig.receipt_message,
-                                    return_policy: storeConfig.return_policy
-                                }}
-                                isPreview={true}
-                            />
+                    {/* Receipt Preview & Backup */}
+                    <div className="space-y-6">
+                        <div className="card p-6">
+                            <h2 className="text-xl font-semibold text-gray-900 mb-4">🧾 Vista Previa del Ticket</h2>
+                            <div className="border rounded-lg overflow-hidden bg-gray-100 p-4 flex justify-center overflow-x-auto">
+                                <TicketView
+                                    storeConfig={{
+                                        name: storeConfig.store_name,
+                                        address: storeConfig.store_address,
+                                        phone: storeConfig.store_phone,
+                                        logo: storeConfig.store_logo,
+                                        message: storeConfig.receipt_message,
+                                        return_policy: storeConfig.return_policy
+                                    }}
+                                    isPreview={true}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Backup Configuration */}
+                        <div className="card p-6 border-l-4 border-blue-500">
+                            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                                💾 Copia de Seguridad
+                            </h2>
+                            <p className="text-sm text-gray-500 mb-6">
+                                Configura una carpeta (ej: Dropbox o Google Drive) para guardar copias automáticas de la base de datos al cerrar el programa.
+                            </p>
+
+                            <div className="space-y-6">
+                                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+                                    <div>
+                                        <p className="font-medium text-gray-900">Backup automático al cerrar</p>
+                                        <p className="text-xs text-gray-500">Se genera una copia cada vez que cierras la aplicación.</p>
+                                    </div>
+                                    <label className="relative inline-flex items-center cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            className="sr-only peer"
+                                            checked={storeConfig.backup_enabled === 'true'}
+                                            onChange={(e) => handleStoreChange('backup_enabled', e.target.checked ? 'true' : 'false')}
+                                        />
+                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                    </label>
+                                </div>
+
+                                {storeConfig.backup_enabled === 'true' && (
+                                    <div className="space-y-3 animate-fade-in">
+                                        <label className="block text-sm font-medium text-gray-700">Carpeta de Destino</label>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                readOnly
+                                                value={storeConfig.backup_path || ''}
+                                                className="input flex-1 bg-gray-50 text-gray-600 text-sm italic"
+                                                placeholder="No se ha seleccionado carpeta"
+                                            />
+                                            <button
+                                                onClick={async () => {
+                                                    const path = await window.api.selectDirectory();
+                                                    if (path) handleStoreChange('backup_path', path);
+                                                }}
+                                                className="btn btn-secondary whitespace-nowrap"
+                                            >
+                                                📁 Seleccionar
+                                            </button>
+                                        </div>
+                                        {storeConfig.backup_path && (
+                                            <p className="text-[10px] text-blue-600 font-medium">
+                                                ✅ Las copias se guardarán en esta ubicación.
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>

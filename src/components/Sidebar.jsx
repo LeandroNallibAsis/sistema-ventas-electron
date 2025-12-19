@@ -14,12 +14,8 @@ const Sidebar = ({ categories, selectedCategory, onSelectCategory, onCreateCateg
     };
 
     return (
-        <div className="w-64 bg-white border-r border-gray-200 flex flex-col h-screen">
-            {/* Header */}
-            <div className="p-6 border-b border-gray-200">
-                <h1 className="text-2xl font-bold text-primary-600">ElectroStock</h1>
-                <p className="text-sm text-gray-500 mt-1">Gestión de Inventario</p>
-            </div>
+        <div className="w-64 bg-white border-r border-gray-200 flex flex-col h-full">
+
 
             {/* Categories List */}
             <div className="flex-1 overflow-y-auto p-4">
@@ -69,8 +65,8 @@ const Sidebar = ({ categories, selectedCategory, onSelectCategory, onCreateCateg
                         <div
                             key={category.id}
                             className={`group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all ${selectedCategory?.id === category.id
-                                    ? 'bg-primary-50 text-primary-700 font-medium'
-                                    : 'hover:bg-gray-50 text-gray-700'
+                                ? 'bg-primary-50 text-primary-700 font-medium'
+                                : 'hover:bg-gray-50 text-gray-700'
                                 }`}
                             onClick={() => onSelectCategory(category)}
                         >

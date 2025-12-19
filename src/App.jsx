@@ -292,7 +292,7 @@ function App() {
       case 'inventory':
       default:
         return (
-          <div className="flex h-screen bg-gray-50">
+          <div className="flex flex-1 h-full bg-gray-50 overflow-hidden">
             {/* Sidebar (Categories) */}
             <Sidebar
               categories={categories}
@@ -368,9 +368,9 @@ function App() {
   }
 
   return (
-    <div className="flex bg-gray-100 font-sans text-gray-900">
+    <div className="flex h-screen overflow-hidden bg-gray-100 font-sans text-gray-900">
       {/* Sidebar Navigation */}
-      <nav className="bg-gray-900 w-64 flex flex-col py-6 gap-2 shadow-xl z-50 items-start">
+      <nav className="bg-gray-900 w-64 flex-shrink-0 flex flex-col py-6 gap-2 shadow-xl z-50 items-start">
         <div className="flex items-center justify-start gap-3 w-full px-6 mb-6">
           <div className="w-10 h-10 bg-blue-600 rounded-lg flex-shrink-0 flex items-center justify-center shadow-lg shadow-blue-900/50">
             <span className="text-white font-bold text-lg">ES</span>
@@ -425,7 +425,7 @@ function App() {
       </nav>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-hidden relative">
+      <main className="flex-1 overflow-y-auto relative h-full">
         {renderContent()}
 
         {/* Modals outside router (if any global) */}
