@@ -110,12 +110,15 @@ const QuoteForm = ({ onCancel, onQuoteCreated }) => {
         return cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     };
 
+    const [saving, setSaving] = useState(false);
+
     const handleSaveQuote = async () => {
         if (cart.length === 0) {
             setError('El presupuesto está vacío');
             return;
         }
 
+        setSaving(true);
         try {
             const quoteData = {
                 client_id: selectedClient?.id,
@@ -130,11 +133,12 @@ const QuoteForm = ({ onCancel, onQuoteCreated }) => {
             };
 
             await window.api.createQuote(quoteData);
-            alert('Presupuesto creado exitosamente');
+            // alert('Presupuesto creado exitosamente'); // Removed blocking alert
             if (onQuoteCreated) onQuoteCreated();
         } catch (error) {
             console.error('Error creating quote:', error);
-            setError('Error al guardar presupuesto');
+            setError('Error al guardar presupuesto: ' + error.message);
+            setSaving(false);
         }
     };
 
@@ -303,10 +307,10 @@ const QuoteForm = ({ onCancel, onQuoteCreated }) => {
                         </div>
                         <button
                             onClick={handleSaveQuote}
-                            disabled={cart.length === 0}
-                            className={`btn btn-primary w-full py-3 text-lg shadow-lg ${cart.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            disabled={cart.length === 0 || saving}
+                            className={`btn btn-primary w-full py-3 text-lg shadow-lg ${cart.length === 0 || saving ? 'opacity-50 cursor-not-allowed' : ''}`}
                         >
-                            💾 Guardar Presupuesto
+                            {saving ? 'Guardando...' : '💾 Guardar Presupuesto'}
                         </button>
                     </div>
                 </div>

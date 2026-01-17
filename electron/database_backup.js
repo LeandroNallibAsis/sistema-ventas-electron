@@ -1592,42 +1592,6 @@ class DatabaseManager {
         return result.changes;
     }
 
-    getFullBackupData() {
-        const tables = [
-            'categories',
-            'products',
-            'payment_config',
-            'sales',
-            'sale_items',
-            'cash_register',
-            'store_config',
-            'users',
-            'clients',
-            'client_movements',
-            'quotes',
-            'quote_items',
-            'suppliers',
-            'purchases',
-            'purchase_payments'
-        ];
-
-        const backupData = {};
-
-        for (const table of tables) {
-            try {
-                // Check if table exists first (for optional phases)
-                const tableExists = this.db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`).get(table);
-                if (tableExists) {
-                    backupData[table] = this.db.prepare(`SELECT * FROM ${table}`).all();
-                }
-            } catch (error) {
-                console.error(`Error backing up table ${table}:`, error);
-            }
-        }
-
-        return backupData;
-    }
-
     close() {
         if (this.db) {
             this.db.close();

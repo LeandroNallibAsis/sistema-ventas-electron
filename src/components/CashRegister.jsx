@@ -166,7 +166,7 @@ const CashRegister = () => {
             setShowIncomeForm(false);
         } catch (error) {
             console.error('Error adding income:', error);
-            alert('Error al registrar ingreso');
+            alert('Error al registrar ingreso: ' + (error.message || 'Error desconocido'));
         }
     };
 

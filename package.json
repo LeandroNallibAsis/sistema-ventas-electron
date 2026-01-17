@@ -1,8 +1,8 @@
 {
-  "name": "electro-stock",
+  "name": "ventacore",
   "private": true,
   "version": "1.0.0",
-  "description": "Sistema de Gestión de Stock Offline",
+  "description": "Sistema Integral de Gestión y Ventas",
   "author": "ElectroStock",
   "main": "electron/main.js",
   "type": "commonjs",
@@ -10,10 +10,10 @@
     "postinstall": "electron-rebuild -f -w better-sqlite3",
     "dev": "concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
     "dev:vite": "vite",
-    "dev:electron": "cross-env NODE_ENV=development wait-on http://localhost:5173 && electron .",
+    "dev:electron": "cross-env NODE_ENV=development ELECTRON_RUN_AS_NODE=0 wait-on http://localhost:5173 && electron .",
     "build": "vite build --outDir dist-react",
     "build:electron": "npm run build && electron-builder",
-    "dist": "npm run build && electron-builder --win",
+    "dist": "npm run build && cross-env ELECTRON_RUN_AS_NODE=0 electron-builder --win",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -46,8 +46,8 @@
     "wait-on": "^8.0.1"
   },
   "build": {
-    "appId": "com.electrostock.app",
-    "productName": "ElectroStock",
+    "appId": "com.ventacore.app",
+    "productName": "VentaCore",
     "directories": {
       "output": "dist"
     },
@@ -57,12 +57,16 @@
       "package.json"
     ],
     "win": {
-      "target": "nsis",
-      "icon": "public/icon.png"
+      "target": [
+        "portable"
+      ],
+      "icon": "public/icon.png",
+      "cscLink": null
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "include": "installer.nsh"
     }
   }
 }

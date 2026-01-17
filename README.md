@@ -1,4 +1,6 @@
-# 📦 ElectroStock - Sistema Integral de Gestión y Ventas
+# 📦 VentaCore - Sistema Integral de Gestión y Ventas
+
+![VentaCore Logo](public/logo_full.png)
 
 **Software profesional de punto de venta (POS) e inventario 100% offline para Windows.**
 
@@ -40,6 +42,7 @@
 ## ✨ Características Destacadas
 
 - 📶 **100% Offline**: Privacidad total y funcionamiento sin internet.
+- 🚀 **Inicio con Windows**: Opción de inicio automático al encender el sistema.
 - 📂 **Copia de Seguridad Automática**: Respaldo automático de toda la base de datos al cerrar el programa en la carpeta que elijas (Dropbox, Drive, etc.).
 - 🚦 **Sistema de Alertas**: Notificaciones persistentes para stock bajo y tareas pendientes.
 - 🔐 **Control de Accesos**: Roles diferenciados para **Admin** (acceso total) y **Vendedor** (solo POS y gestión operativa).
@@ -107,4 +110,4 @@ npm run dist
 
 ---
 
-**ElectroStock: Potenciando tu negocio con simplicidad y control.**
+**VentaCore: Potenciando tu negocio con simplicidad y control.**

@@ -224,7 +224,17 @@ function setupIPC() {
 
     ipcMain.handle('update-store-config', async (event, key, value) => {
         try {
-            return dbManager.updateStoreConfig(key, value);
+            const result = dbManager.updateStoreConfig(key, value);
+
+            // Handle auto-start setting
+            if (key === 'auto_start' && app.isPackaged) {
+                app.setLoginItemSettings({
+                    openAtLogin: value === 'true',
+                    path: app.getPath('exe')
+                });
+            }
+
+            return result;
         } catch (error) {
             console.error('Error updating store config:', error);
             throw error;
@@ -297,6 +307,15 @@ function setupIPC() {
             return dbManager.deleteUser(id);
         } catch (error) {
             console.error('Error deleting user:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('count-users', async () => {
+        try {
+            return dbManager.countUsers();
+        } catch (error) {
+            console.error('Error counting users:', error);
             throw error;
         }
     });
@@ -669,19 +688,50 @@ const performBackup = async () => {
     try {
         const config = dbManager.getStoreConfig();
         if (config.backup_enabled === 'true' && config.backup_path) {
-            const dbPath = path.join(app.getPath('userData'), 'database.sqlite');
-            if (fs.existsSync(dbPath)) {
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').split('.')[0];
-                const backupFile = `electrostock_backup_${timestamp}.sqlite`;
-                const destination = path.join(config.backup_path, backupFile);
 
-                if (!fs.existsSync(config.backup_path)) {
-                    fs.mkdirSync(config.backup_path, { recursive: true });
-                }
+            // New Logic: Overwrite unique file .xlsx
+            const backupFile = `VentaCore_Backup.xlsx`;
+            const destination = path.join(config.backup_path, backupFile);
 
-                fs.copyFileSync(dbPath, destination);
-                console.log(`Automatic backup successful: ${destination}`);
+            if (!fs.existsSync(config.backup_path)) {
+                fs.mkdirSync(config.backup_path, { recursive: true });
             }
+
+            // Get all data
+            const allData = dbManager.getFullBackupData();
+
+            // Create Workbook
+            const wb = XLSX.utils.book_new();
+
+            // Add Cash Register Sheet (First one for compatibility)
+            if (allData.cash_register) {
+                const cashData = allData.cash_register.map(entry => ({
+                    'ID': entry.id,
+                    'Fecha': entry.entry_date,
+                    'Tipo': entry.type === 'income' ? 'INGRESO' : 'EGRESO',
+                    'Monto': entry.amount,
+                    'Moneda': entry.currency,
+                    'Método de Pago': entry.payment_method || '',
+                    'Descripción': entry.description || '',
+                    'Categoría': entry.expense_category || '',
+                    'ID Venta': entry.sale_id || ''
+                }));
+                const ws = XLSX.utils.json_to_sheet(cashData);
+                XLSX.utils.book_append_sheet(wb, ws, 'Libro de Caja');
+            }
+
+            // Add other sheets
+            for (const [tableName, data] of Object.entries(allData)) {
+                if (tableName === 'cash_register') continue; // Already added formatted
+                if (data && data.length > 0) {
+                    const ws = XLSX.utils.json_to_sheet(data);
+                    XLSX.utils.book_append_sheet(wb, ws, tableName);
+                }
+            }
+
+            // Write File
+            XLSX.writeFile(wb, destination);
+            console.log(`Backup (Overwrite) successful: ${destination}`);
         }
     } catch (error) {
         console.error('Error performing automatic backup:', error);
@@ -698,6 +748,19 @@ app.whenReady().then(() => {
 
     // Create window
     createWindow();
+
+    // Ensure auto-start consistency
+    try {
+        const config = dbManager.getStoreConfig();
+        if (config.auto_start && app.isPackaged) {
+            app.setLoginItemSettings({
+                openAtLogin: config.auto_start === 'true',
+                path: app.getPath('exe')
+            });
+        }
+    } catch (error) {
+        console.error('Error syncing auto-start:', error);
+    }
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {

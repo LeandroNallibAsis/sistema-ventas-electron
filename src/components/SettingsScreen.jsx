@@ -1,3 +1,154 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import React, { useState, useEffect } from 'react';
 import TicketView from './TicketView';
 
@@ -12,7 +163,8 @@ const SettingsScreen = () => {
         receipt_message: '',
         return_policy: '',
         backup_enabled: 'false',
-        backup_path: ''
+        backup_path: '',
+        auto_start: 'false'
     });
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -352,6 +504,28 @@ const SettingsScreen = () => {
                                         )}
                                     </div>
                                 )}
+                            </div>
+                        </div>
+
+                        {/* Startup Configuration */}
+                        <div className="card p-6 border-l-4 border-emerald-500">
+                            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                                🚀 Inicio del Sistema
+                            </h2>
+                            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+                                <div>
+                                    <p className="font-medium text-gray-900">Iniciar con Windows</p>
+                                    <p className="text-xs text-gray-500">Abrir automáticamente al encender la computadora.</p>
+                                </div>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        className="sr-only peer"
+                                        checked={storeConfig.auto_start === 'true'}
+                                        onChange={(e) => handleStoreChange('auto_start', e.target.checked ? 'true' : 'false')}
+                                    />
+                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                                </label>
                             </div>
                         </div>
                     </div>

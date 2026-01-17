@@ -1,33 +1,47 @@
 import React, { useState } from 'react';
 
-const Sidebar = ({ categories, selectedCategory, onSelectCategory, onCreateCategory, onDeleteCategory }) => {
+const Sidebar = ({ categories, selectedCategory, onSelectCategory, onCreateCategory, onDeleteCategory, readOnly }) => {
     const [isAdding, setIsAdding] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState('');
+    const [submitting, setSubmitting] = useState(false);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (newCategoryName.trim()) {
-            await onCreateCategory(newCategoryName.trim());
-            setNewCategoryName('');
-            setIsAdding(false);
+            setSubmitting(true);
+            try {
+                await onCreateCategory(newCategoryName.trim());
+                setNewCategoryName('');
+                setIsAdding(false);
+            } catch (error) {
+                // Error handled by parent, but we stop loading
+            } finally {
+                setSubmitting(false);
+            }
         }
     };
 
     return (
         <div className="w-64 bg-white border-r border-gray-200 flex flex-col h-full">
 
+            {/* Branding Header */}
+            <div className="p-4 border-b border-gray-200 flex items-center justify-center">
+                <img src="logo_full.png" alt="VentaCore" className="h-10 w-auto object-contain" />
+            </div>
 
             {/* Categories List */}
             <div className="flex-1 overflow-y-auto p-4">
                 <div className="flex items-center justify-between mb-3">
                     <h2 className="text-sm font-semibold text-gray-700 uppercase">Categorías</h2>
-                    <button
-                        onClick={() => setIsAdding(true)}
-                        className="text-primary-600 hover:text-primary-700 text-xl font-bold"
-                        title="Agregar categoría"
-                    >
-                        +
-                    </button>
+                    {!readOnly && (
+                        <button
+                            onClick={() => setIsAdding(true)}
+                            className="text-primary-600 hover:text-primary-700 text-xl font-bold"
+                            title="Agregar categoría"
+                        >
+                            +
+                        </button>
+                    )}
                 </div>
 
                 {/* Add Category Form */}
@@ -40,10 +54,11 @@ const Sidebar = ({ categories, selectedCategory, onSelectCategory, onCreateCateg
                             placeholder="Nombre de categoría"
                             className="input text-sm mb-2"
                             autoFocus
+                            disabled={submitting}
                         />
                         <div className="flex gap-2">
-                            <button type="submit" className="btn btn-primary btn-sm flex-1">
-                                Crear
+                            <button type="submit" className="btn btn-primary btn-sm flex-1" disabled={submitting}>
+                                {submitting ? '...' : 'Crear'}
                             </button>
                             <button
                                 type="button"
@@ -52,6 +67,7 @@ const Sidebar = ({ categories, selectedCategory, onSelectCategory, onCreateCateg
                                     setNewCategoryName('');
                                 }}
                                 className="btn btn-secondary btn-sm"
+                                disabled={submitting}
                             >
                                 Cancelar
                             </button>
@@ -99,7 +115,7 @@ const Sidebar = ({ categories, selectedCategory, onSelectCategory, onCreateCateg
             {/* Footer */}
             <div className="p-4 border-t border-gray-200 bg-gray-50">
                 <p className="text-xs text-gray-500 text-center">
-                    ElectroStock v1.0
+                    VentaCore v1.0
                 </p>
             </div>
         </div>

@@ -34,8 +34,8 @@ const LoginScreen = ({ onLogin }) => {
 
             <div className="bg-white/10 backdrop-blur-lg border border-white/20 p-8 rounded-2xl shadow-xl w-full max-w-md z-10 relative">
                 <div className="text-center mb-8">
-                    <h1 className="text-4xl font-bold text-white mb-2">Bienvenido</h1>
-                    <p className="text-gray-300">Inicia sesión para continuar</p>
+                    <img src="logo_full.png" alt="VentaCore Logo" className="w-56 mx-auto mb-6 drop-shadow-xl" />
+                    <p className="text-gray-400 font-medium">Sistema de Gestión Profesional</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
@@ -77,9 +77,6 @@ const LoginScreen = ({ onLogin }) => {
                         {loading ? 'Verificando...' : 'Ingresar'}
                     </button>
 
-                    <div className="text-center text-xs text-gray-400 mt-4">
-                        Credenciales por defecto: admin / 123
-                    </div>
                 </form>
             </div>
         </div>

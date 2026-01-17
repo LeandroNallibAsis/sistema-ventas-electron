@@ -12,6 +12,7 @@ import MonthlyReport from './components/MonthlyReport';
 import './index.css';
 
 import LoginScreen from './components/LoginScreen';
+import SetupScreen from './components/SetupScreen';
 import UserManagement from './components/UserManagement';
 import ClientManagement from './components/ClientManagement';
 import SupplierManagement from './components/SupplierManagement';
@@ -23,6 +24,8 @@ import { generateBulkPrintHTML } from './utils/barcodePrinter';
 
 function App() {
   const [user, setUser] = useState(null); // { id, username, role, name }
+  const [needsSetup, setNeedsSetup] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard', 'inventory', 'pos', 'sales', 'cash', 'reports', 'settings', 'users', 'clients', 'suppliers', 'purchases', 'quotes'
 
   const [categories, setCategories] = useState([]);
@@ -95,6 +98,21 @@ function App() {
     loadCategories();
   }, []);
 
+  // Check if system needs setup (no users)
+  useEffect(() => {
+    const checkSetup = async () => {
+      try {
+        const count = await window.api.countUsers();
+        setNeedsSetup(count === 0);
+      } catch (error) {
+        console.error('Error checking user count:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    checkSetup();
+  }, []);
+
   // Load products when category changes
   useEffect(() => {
     if (selectedCategory && currentView === 'inventory') {
@@ -136,7 +154,8 @@ function App() {
       setSelectedCategory(newCategory);
     } catch (error) {
       console.error('Error creating category:', error);
-      alert('Error al crear categoría. Puede que ya exista.');
+      alert('Error al crear categoría. Verifica que no exista una con el mismo nombre.');
+      throw error; // Re-throw so Sidebar knows it failed
     }
   };
 
@@ -363,6 +382,14 @@ function App() {
     }
   };
 
+  if (loading) {
+    return <div className="min-h-screen bg-gray-900 flex items-center justify-center text-white">Cargando...</div>;
+  }
+
+  if (needsSetup) {
+    return <SetupScreen onComplete={(userData) => { setNeedsSetup(false); setUser(userData); }} />;
+  }
+
   if (!user) {
     return <LoginScreen onLogin={handleLogin} />;
   }
@@ -371,11 +398,8 @@ function App() {
     <div className="flex h-screen overflow-hidden bg-gray-100 font-sans text-gray-900">
       {/* Sidebar Navigation */}
       <nav className="bg-gray-900 w-64 flex-shrink-0 flex flex-col py-6 gap-2 shadow-xl z-50 items-start">
-        <div className="flex items-center justify-start gap-3 w-full px-6 mb-6">
-          <div className="w-10 h-10 bg-blue-600 rounded-lg flex-shrink-0 flex items-center justify-center shadow-lg shadow-blue-900/50">
-            <span className="text-white font-bold text-lg">ES</span>
-          </div>
-          <span className="text-white font-bold text-xl whitespace-nowrap">ElectroStock</span>
+        <div className="flex items-center justify-center w-full px-4 mb-6">
+          <img src="logo_full.png" alt="VentaCore Logo" className="w-40 drop-shadow-md" />
         </div>
 
         {[
@@ -433,9 +457,9 @@ function App() {
           <ProductForm
             onSubmit={editingProduct ? handleUpdateProduct : handleCreateProduct}
             onCancel={() => { setShowProductForm(false); setEditingProduct(null); }}
-            initialData={editingProduct}
+            product={editingProduct}
             categories={categories}
-            selectedCategoryId={selectedCategory?.id}
+            categoryId={selectedCategory?.id}
           />
         )}
 
