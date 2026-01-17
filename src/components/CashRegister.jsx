@@ -44,6 +44,7 @@ const CashRegister = () => {
     const [showExpenseForm, setShowExpenseForm] = useState(false);
     const [showIncomeForm, setShowIncomeForm] = useState(false);
     const [showExportModal, setShowExportModal] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
 
     // Form data
     const [expenseData, setExpenseData] = useState({
@@ -70,7 +71,7 @@ const CashRegister = () => {
     useEffect(() => {
         loadCashRegister();
         loadBalances();
-    }, [filters.startDate, filters.endDate]);
+    }, [filters.startDate, filters.endDate, filters.type, filters.currency]);
 
     useEffect(() => {
         applyFilters();
@@ -97,27 +98,7 @@ const CashRegister = () => {
     };
 
     const applyFilters = () => {
-        let filtered = [...entries];
-
-        if (filters.type !== 'all') {
-            filtered = filtered.filter(e => e.type === filters.type);
-        }
-
-        if (filters.currency !== 'all') {
-            filtered = filtered.filter(e => e.currency === filters.currency);
-        }
-
-        if (filters.startDate) {
-            filtered = filtered.filter(e => new Date(e.entry_date) >= new Date(filters.startDate));
-        }
-
-        if (filters.endDate) {
-            const endDate = new Date(filters.endDate);
-            endDate.setHours(23, 59, 59, 999);
-            filtered = filtered.filter(e => new Date(e.entry_date) <= endDate);
-        }
-
-        setFilteredEntries(filtered);
+        setFilteredEntries(entries);
     };
 
     const handleAddExpense = async (e) => {
@@ -271,15 +252,18 @@ const CashRegister = () => {
         }
 
         try {
+            setIsLoading(true);
             const result = await window.api.importCashRegister(mode);
             if (result.success) {
                 alert(`Restauración exitosa: ${result.count} registros importados`);
-                loadCashRegister();
-                loadBalances();
+                await loadCashRegister();
+                await loadBalances();
             }
         } catch (error) {
             console.error('Error restoring cash register:', error);
             alert('Error al restaurar backup. Verifique que el archivo Excel sea válido.');
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -447,7 +431,16 @@ const CashRegister = () => {
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                            {filteredEntries.length === 0 ? (
+                            {isLoading ? (
+                                <tr>
+                                    <td colSpan="9" className="px-6 py-20 text-center">
+                                        <div className="flex flex-col items-center justify-center gap-4">
+                                            <div className="w-12 h-12 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin"></div>
+                                            <p className="text-gray-500 font-medium">Importando datos, por favor espere...</p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : filteredEntries.length === 0 ? (
                                 <tr>
                                     <td colSpan="9" className="px-6 py-12 text-center text-gray-400">
                                         No hay movimientos registrados

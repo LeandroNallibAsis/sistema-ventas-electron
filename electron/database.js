@@ -836,12 +836,12 @@ class DatabaseManager {
             params.push(filters.endDate + ' 23:59:59');
         }
 
-        if (filters.type) {
+        if (filters.type && filters.type !== 'all') {
             query += ' AND cr.type = ?';
             params.push(filters.type);
         }
 
-        if (filters.currency) {
+        if (filters.currency && filters.currency !== 'all') {
             query += ' AND cr.currency = ?';
             params.push(filters.currency);
         }
@@ -908,6 +908,36 @@ class DatabaseManager {
             expense: result.expense || 0,
             balance: (result.income || 0) - (result.expense || 0)
         };
+    }
+
+    importCashRegister(data, mode) {
+        const importTx = this.db.transaction((entries) => {
+            if (mode === 'replace') {
+                this.db.prepare('DELETE FROM cash_register').run();
+            }
+
+            const stmt = this.db.prepare(`
+                INSERT INTO cash_register (
+                    entry_date, type, amount, currency, 
+                    payment_method, description, expense_category, sale_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `);
+
+            for (const entry of entries) {
+                stmt.run(
+                    entry.entry_date,
+                    entry.type,
+                    entry.amount,
+                    entry.currency,
+                    entry.payment_method,
+                    entry.description,
+                    entry.expense_category,
+                    entry.sale_id
+                );
+            }
+        });
+
+        return importTx(data);
     }
 
     // Payment Config Operations

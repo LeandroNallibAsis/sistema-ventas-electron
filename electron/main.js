@@ -531,21 +531,45 @@ function setupIPC() {
             if (!result.canceled && result.filePaths.length > 0) {
                 // Read Excel file
                 const workbook = XLSX.readFile(result.filePaths[0]);
-                const sheetName = workbook.SheetNames[0];
+
+                // Try to find "Libro de Caja" sheet, otherwise use the first one
+                let sheetName = workbook.SheetNames.find(name => name.toLowerCase() === 'libro de caja');
+                if (!sheetName) sheetName = workbook.SheetNames[0];
+
                 const worksheet = workbook.Sheets[sheetName];
                 const excelData = XLSX.utils.sheet_to_json(worksheet);
 
                 // Convert Excel data back to database format
-                const data = excelData.map(row => ({
-                    entry_date: row['Fecha'],
-                    type: row['Tipo'] === 'INGRESO' ? 'income' : 'expense',
-                    amount: row['Monto'],
-                    currency: row['Moneda'],
-                    payment_method: row['Método de Pago'] || null,
-                    description: row['Descripción'] || null,
-                    expense_category: row['Categoría'] || null,
-                    sale_id: row['ID Venta'] || null
-                }));
+                const data = excelData.map(row => {
+                    const typeValue = (row['Tipo'] || '').toString().toUpperCase();
+
+                    // Handle Excel Date serial vs String
+                    let entryDate = row['Fecha'];
+                    if (typeof entryDate === 'number') {
+                        // Excel serial date to JS Date
+                        const date = new Date((entryDate - 25569) * 86400 * 1000);
+                        entryDate = date.toISOString().replace('T', ' ').split('.')[0];
+                    } else if (entryDate) {
+                        // Try parsing if it's a string, ensure it's valid or use current
+                        const date = new Date(entryDate);
+                        if (!isNaN(date.getTime())) {
+                            entryDate = date.toISOString().replace('T', ' ').split('.')[0];
+                        }
+                    } else {
+                        entryDate = new Date().toISOString().replace('T', ' ').split('.')[0];
+                    }
+
+                    return {
+                        entry_date: entryDate,
+                        type: typeValue === 'INGRESO' ? 'income' : 'expense',
+                        amount: row['Monto'],
+                        currency: row['Moneda'],
+                        payment_method: row['Método de Pago'] || null,
+                        description: row['Descripción'] || null,
+                        expense_category: row['Categoría'] || null,
+                        sale_id: row['ID Venta'] || null
+                    };
+                });
 
                 // Import data
                 dbManager.importCashRegister(data, mode);
