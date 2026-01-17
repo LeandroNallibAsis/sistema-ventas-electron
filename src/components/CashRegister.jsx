@@ -717,4 +717,4 @@ const CashRegister = () => {
     );
 };
 
-export default CashRegister;
+export default React.memo(CashRegister);

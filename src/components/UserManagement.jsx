@@ -120,8 +120,8 @@ const UserManagement = () => {
                                 <td className="p-4 text-gray-600">{user.username}</td>
                                 <td className="p-4">
                                     <span className={`px-2 py-1 rounded-full text-xs font-semibold ${user.role === 'admin'
-                                            ? 'bg-purple-100 text-purple-700'
-                                            : 'bg-blue-100 text-blue-700'
+                                        ? 'bg-purple-100 text-purple-700'
+                                        : 'bg-blue-100 text-blue-700'
                                         }`}>
                                         {user.role === 'admin' ? 'Administrador' : 'Vendedor'}
                                     </span>
@@ -251,4 +251,4 @@ const UserManagement = () => {
     );
 };
 
-export default UserManagement;
+export default React.memo(UserManagement);

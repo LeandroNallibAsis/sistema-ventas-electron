@@ -109,4 +109,4 @@ const ProductList = ({ products, onEdit, onDelete, onShowBarcode }) => {
     );
 };
 
-export default ProductList;
+export default React.memo(ProductList);

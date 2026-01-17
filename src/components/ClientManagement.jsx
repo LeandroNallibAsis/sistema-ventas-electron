@@ -432,4 +432,4 @@ const ClientManagement = () => {
     );
 };
 
-export default ClientManagement;
+export default React.memo(ClientManagement);

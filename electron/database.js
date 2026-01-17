@@ -341,6 +341,17 @@ class DatabaseManager {
 
         // Initialize default payment configurations
         this.initializePaymentConfigs();
+
+        // Index creation for performance optimization
+        this.db.exec(`
+            CREATE INDEX IF NOT EXISTS idx_products_category ON products(category_id);
+            CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(barcode);
+            CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(sale_date);
+            CREATE INDEX IF NOT EXISTS idx_sale_items_sale ON sale_items(sale_id);
+            CREATE INDEX IF NOT EXISTS idx_cash_date ON cash_register(entry_date);
+            CREATE INDEX IF NOT EXISTS idx_client_movements_client ON client_movements(client_id);
+            CREATE INDEX IF NOT EXISTS idx_quotes_client ON quotes(client_id);
+        `);
     }
 
     // User Operations

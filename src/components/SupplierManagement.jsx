@@ -316,4 +316,4 @@ const SupplierManagement = () => {
     );
 };
 
-export default SupplierManagement;
+export default React.memo(SupplierManagement);

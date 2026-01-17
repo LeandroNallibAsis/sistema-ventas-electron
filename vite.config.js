@@ -7,5 +7,15 @@ export default defineConfig({
   base: './',
   build: {
     outDir: 'dist-react',
+    minify: 'esbuild',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom'],
+          'ui-vendor': ['recharts', 'jsbarcode', 'xlsx'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000,
   },
 })

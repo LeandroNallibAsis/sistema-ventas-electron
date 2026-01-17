@@ -348,4 +348,4 @@ const SalesHistory = () => {
     );
 };
 
-export default SalesHistory;
+export default React.memo(SalesHistory);
