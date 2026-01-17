@@ -175,9 +175,9 @@ function setupIPC() {
         }
     });
 
-    ipcMain.handle('get-balance', async (event, currency) => {
+    ipcMain.handle('get-balance', async (event, currency, filters) => {
         try {
-            return dbManager.getBalance(currency);
+            return dbManager.getBalance(currency, filters);
         } catch (error) {
             console.error('Error getting balance:', error);
             throw error;

@@ -822,7 +822,7 @@ class DatabaseManager {
 
         if (filters.endDate) {
             query += ' AND cr.entry_date <= ?';
-            params.push(filters.endDate);
+            params.push(filters.endDate + ' 23:59:59');
         }
 
         if (filters.type) {
@@ -870,15 +870,28 @@ class DatabaseManager {
         return { id: result.lastInsertRowid, ...incomeData };
     }
 
-    getBalance(currency) {
-        const stmt = this.db.prepare(`
+    getBalance(currency, filters = {}) {
+        let query = `
             SELECT 
                 SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) as income,
                 SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) as expense
             FROM cash_register
             WHERE currency = ?
-        `);
-        const result = stmt.get(currency);
+        `;
+        const params = [currency];
+
+        if (filters.startDate) {
+            query += ' AND entry_date >= ?';
+            params.push(filters.startDate);
+        }
+
+        if (filters.endDate) {
+            query += ' AND entry_date <= ?';
+            params.push(filters.endDate + ' 23:59:59');
+        }
+
+        const stmt = this.db.prepare(query);
+        const result = stmt.get(...params);
         return {
             income: result.income || 0,
             expense: result.expense || 0,

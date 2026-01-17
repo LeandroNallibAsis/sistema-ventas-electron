@@ -407,7 +407,7 @@ function App() {
           { id: 'inventory', icon: '📦', label: 'Inventario', show: true },
           { id: 'pos', icon: '🛒', label: 'Punto de Venta', show: canShow('pos') },
           { id: 'sales', icon: '📜', label: 'Historial Ventas', show: canShow('sales') },
-          { id: 'cash', icon: '💵', label: 'Caja Diaria', show: canShow('cash') },
+          { id: 'cash', icon: '💵', label: 'Libro de Caja', show: canShow('cash') },
           { id: 'clients', icon: '👥', label: 'Clientes', show: canShow('clients') },
           { id: 'quotes', icon: '📋', label: 'Presupuestos', show: canShow('quotes') },
           { id: 'suppliers', icon: '🚚', label: 'Proveedores', show: canShow('suppliers') },

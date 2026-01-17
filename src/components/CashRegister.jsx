@@ -36,8 +36,8 @@ const CashRegister = () => {
     const [filters, setFilters] = useState({
         type: 'all',
         currency: 'all',
-        startDate: '',
-        endDate: ''
+        startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+        endDate: new Date().toISOString().split('T')[0]
     });
 
     // Modal states
@@ -70,7 +70,7 @@ const CashRegister = () => {
     useEffect(() => {
         loadCashRegister();
         loadBalances();
-    }, []);
+    }, [filters.startDate, filters.endDate]);
 
     useEffect(() => {
         applyFilters();
@@ -78,7 +78,7 @@ const CashRegister = () => {
 
     const loadCashRegister = async () => {
         try {
-            const data = await window.api.getCashRegister({});
+            const data = await window.api.getCashRegister(filters);
             setEntries(data);
         } catch (error) {
             console.error('Error loading cash register:', error);
@@ -87,8 +87,8 @@ const CashRegister = () => {
 
     const loadBalances = async () => {
         try {
-            const balARS = await window.api.getBalance('ARS');
-            const balUSD = await window.api.getBalance('USD');
+            const balARS = await window.api.getBalance('ARS', filters);
+            const balUSD = await window.api.getBalance('USD', filters);
             setBalanceARS(balARS);
             setBalanceUSD(balUSD);
         } catch (error) {

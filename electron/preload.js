@@ -28,7 +28,7 @@ contextBridge.exposeInMainWorld('api', {
     getCashRegister: (filters) => ipcRenderer.invoke('get-cash-register', filters),
     createExpense: (expenseData) => ipcRenderer.invoke('create-expense', expenseData),
     createIncome: (incomeData) => ipcRenderer.invoke('create-income', incomeData),
-    getBalance: (currency) => ipcRenderer.invoke('get-balance', currency),
+    getBalance: (currency, filters) => ipcRenderer.invoke('get-balance', currency, filters),
 
     // Payment config operations
     getPaymentConfigs: () => ipcRenderer.invoke('get-payment-configs'),
