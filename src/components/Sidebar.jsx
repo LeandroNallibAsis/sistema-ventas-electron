@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 
-const Sidebar = ({ categories, selectedCategory, onSelectCategory, onCreateCategory, onDeleteCategory, readOnly }) => {
+const Sidebar = ({ categories, selectedCategory, onSelectCategory, onCreateCategory, onDeleteCategory, onDeleteMultipleCategories, readOnly }) => {
     const [isAdding, setIsAdding] = useState(false);
     const [newCategoryName, setNewCategoryName] = useState('');
     const [submitting, setSubmitting] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedIds, setSelectedIds] = useState(new Set());
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -21,6 +23,29 @@ const Sidebar = ({ categories, selectedCategory, onSelectCategory, onCreateCateg
         }
     };
 
+    const handleToggleSelect = (e, id) => {
+        e.stopPropagation();
+        const newSelected = new Set(selectedIds);
+        if (newSelected.has(id)) {
+            newSelected.delete(id);
+        } else {
+            newSelected.add(id);
+        }
+        setSelectedIds(newSelected);
+    };
+
+    const handleBatchDelete = () => {
+        if (selectedIds.size === 0) return;
+        if (window.confirm(`¿Estás seguro de eliminar las ${selectedIds.size} categorías seleccionadas?`)) {
+            onDeleteMultipleCategories(Array.from(selectedIds));
+            setSelectedIds(new Set());
+        }
+    };
+
+    const filteredCategories = categories.filter(c => 
+        c.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
     return (
         <div className="w-64 bg-white border-r border-gray-200 flex flex-col h-full">
 
@@ -33,15 +58,37 @@ const Sidebar = ({ categories, selectedCategory, onSelectCategory, onCreateCateg
             <div className="flex-1 overflow-y-auto p-4">
                 <div className="flex items-center justify-between mb-3">
                     <h2 className="text-sm font-semibold text-gray-700 uppercase">Categorías</h2>
-                    {!readOnly && (
-                        <button
-                            onClick={() => setIsAdding(true)}
-                            className="text-primary-600 hover:text-primary-700 text-xl font-bold"
-                            title="Agregar categoría"
-                        >
-                            +
-                        </button>
-                    )}
+                    <div className="flex gap-2">
+                        {!readOnly && selectedIds.size > 0 && (
+                            <button
+                                onClick={handleBatchDelete}
+                                className="text-danger-600 hover:text-danger-700 text-sm font-bold bg-danger-50 px-2 rounded"
+                                title="Eliminar seleccionados"
+                            >
+                                🗑️ ({selectedIds.size})
+                            </button>
+                        )}
+                        {!readOnly && (
+                            <button
+                                onClick={() => setIsAdding(true)}
+                                className="text-primary-600 hover:text-primary-700 text-xl font-bold"
+                                title="Agregar categoría"
+                            >
+                                +
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {/* Search Bar */}
+                <div className="mb-3">
+                    <input
+                        type="text"
+                        placeholder="Buscar categoría..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="input text-sm w-full bg-gray-50 border-gray-200"
+                    />
                 </div>
 
                 {/* Add Category Form */}
@@ -77,7 +124,7 @@ const Sidebar = ({ categories, selectedCategory, onSelectCategory, onCreateCateg
 
                 {/* Category Items */}
                 <div className="space-y-1">
-                    {categories.map((category) => (
+                    {filteredCategories.map((category) => (
                         <div
                             key={category.id}
                             className={`group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all ${selectedCategory?.id === category.id
@@ -86,12 +133,21 @@ const Sidebar = ({ categories, selectedCategory, onSelectCategory, onCreateCateg
                                 }`}
                             onClick={() => onSelectCategory(category)}
                         >
+                            {!readOnly && (
+                                <input
+                                    type="checkbox"
+                                    className="mr-3 w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                                    checked={selectedIds.has(category.id)}
+                                    onChange={(e) => handleToggleSelect(e, category.id)}
+                                    onClick={(e) => e.stopPropagation()}
+                                />
+                            )}
                             <span className="flex-1 truncate">{category.name}</span>
-                            {selectedCategory?.id === category.id && (
+                            {!readOnly && selectedCategory?.id === category.id && (
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        if (confirm(`¿Eliminar categoría "${category.name}"?`)) {
+                                        if (window.confirm(`¿Eliminar categoría "${category.name}"?`)) {
                                             onDeleteCategory(category.id);
                                         }
                                     }}

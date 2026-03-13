@@ -23,7 +23,9 @@ const POSScreen = () => {
 
     const [showSearchModal, setShowSearchModal] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [searchCategory, setSearchCategory] = useState('');
     const [searchResults, setSearchResults] = useState([]);
+    const [allCategories, setAllCategories] = useState([]);
 
     // Client Search States
     const [selectedClient, setSelectedClient] = useState(null);
@@ -54,9 +56,19 @@ const POSScreen = () => {
 
     useEffect(() => {
         loadPaymentConfigs();
+        loadCategories();
         // Auto-focus barcode input
         barcodeInputRef.current?.focus();
     }, []);
+
+    const loadCategories = async () => {
+        try {
+            const cats = await window.api.getCategories();
+            setAllCategories(cats);
+        } catch (error) {
+            console.error('Error loading categories:', error);
+        }
+    };
 
     useEffect(() => {
         // Debounce search
@@ -81,12 +93,18 @@ const POSScreen = () => {
 
     const performSearch = async () => {
         try {
-            const results = await window.api.searchProducts(searchQuery);
+            const results = await window.api.searchProducts(searchQuery, searchCategory || null);
             setSearchResults(results);
         } catch (error) {
             console.error('Error searching products:', error);
         }
     };
+
+    useEffect(() => {
+        if (showSearchModal) {
+            performSearch();
+        }
+    }, [searchCategory]);
 
     const performClientSearch = async (query) => {
         try {
@@ -396,8 +414,22 @@ const POSScreen = () => {
 
                 {/* Shopping Cart */}
                 <div className="flex-1 card overflow-hidden flex flex-col">
-                    <div className="p-4 border-b border-gray-200 bg-gray-50">
+                    <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
                         <h2 className="text-lg font-semibold">🛒 Carrito ({cart.length})</h2>
+                        {cart.length > 0 && (
+                            <button
+                                onClick={() => {
+                                    if (window.confirm("¿Estás seguro de vaciar todo el carrito?")) {
+                                        setCart([]);
+                                        setError("");
+                                    }
+                                }}
+                                className="text-sm text-danger-600 hover:text-danger-800 font-medium"
+                                title="Vaciar Carrito"
+                            >
+                                🗑️ Vaciar Carrito
+                            </button>
+                        )}
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-4">
@@ -681,14 +713,26 @@ const POSScreen = () => {
                             </button>
                         </div>
 
-                        <input
-                            ref={searchInputRef}
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="input mb-4"
-                            placeholder="Escriba el nombre del producto..."
-                        />
+                        <div className="flex gap-2 mb-4">
+                            <input
+                                ref={searchInputRef}
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="input flex-1"
+                                placeholder="Escriba el nombre del producto..."
+                            />
+                            <select
+                                value={searchCategory}
+                                onChange={(e) => setSearchCategory(e.target.value)}
+                                className="input w-48"
+                            >
+                                <option value="">Todas las categorías</option>
+                                {allCategories.map(cat => (
+                                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                ))}
+                            </select>
+                        </div>
 
                         <div className="flex-1 overflow-y-auto border border-gray-200 rounded-lg">
                             {searchResults.length === 0 ? (

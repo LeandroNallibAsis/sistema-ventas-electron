@@ -54,9 +54,18 @@ function setupIPC() {
 
     ipcMain.handle('delete-category', async (event, id) => {
         try {
-            return dbManager.deleteCategory(id);
+             return dbManager.deleteCategory(id);
         } catch (error) {
             console.error('Error deleting category:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('delete-multiple-categories', async (event, ids) => {
+        try {
+            return dbManager.deleteCategories(ids);
+        } catch (error) {
+            console.error('Error deleting multiple categories:', error);
             throw error;
         }
     });
@@ -94,6 +103,15 @@ function setupIPC() {
             return dbManager.deleteProduct(id);
         } catch (error) {
             console.error('Error deleting product:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('delete-multiple-products', async (event, ids) => {
+        try {
+            return dbManager.deleteProducts(ids);
+        } catch (error) {
+            console.error('Error deleting multiple products:', error);
             throw error;
         }
     });
@@ -145,6 +163,15 @@ function setupIPC() {
         }
     });
 
+    ipcMain.handle('delete-sale', async (event, saleId) => {
+        try {
+            return dbManager.deleteSale(saleId);
+        } catch (error) {
+            console.error('Error deleting sale:', error);
+            throw error;
+        }
+    });
+
     ipcMain.handle('get-sale-detail', async (event, saleId) => {
         try {
             const sale = dbManager.getSaleById(saleId);
@@ -162,6 +189,15 @@ function setupIPC() {
             return dbManager.getCashRegisterEntries(filters);
         } catch (error) {
             console.error('Error getting cash register:', error);
+            throw error;
+        }
+    });
+
+    ipcMain.handle('delete-cash-entry', async (event, id) => {
+        try {
+            return dbManager.deleteCashEntry(id);
+        } catch (error) {
+            console.error('Error deleting cash entry:', error);
             throw error;
         }
     });
@@ -704,61 +740,130 @@ function setupIPC() {
             return result.filePaths[0];
         }
     });
+
+    ipcMain.handle('create-backup-manual', async () => {
+        try {
+            await performBackup(true); // Call existing logic, forcing it if necessary
+            return { success: true };
+        } catch (error) {
+            console.error('Error creating manual backup:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('restore-backup-manual', async () => {
+        try {
+            const config = dbManager.getStoreConfig();
+            let backupFolder = config.backup_path;
+
+            if (!backupFolder) {
+                // Determine default behavior if path not set
+                const userDataPath = app.getPath('userData');
+                backupFolder = path.join(userDataPath, 'backups');
+            }
+
+            const tablasCopiaPath = path.join(backupFolder, 'tablas copia');
+
+            if (!fs.existsSync(tablasCopiaPath)) {
+                return { success: false, error: 'La carpeta "tablas copia" no existe en la ruta de respaldo configurada.' };
+            }
+
+            const files = fs.readdirSync(tablasCopiaPath).filter(f => f.endsWith('.xlsx'));
+            if (files.length === 0) {
+                return { success: false, error: 'No se encontraron archivos Excel en "tablas copia".' };
+            }
+
+            const dataToRestore = {};
+
+            for (const file of files) {
+                const tableName = file.replace('.xlsx', '');
+                const filePath = path.join(tablasCopiaPath, file);
+
+                const workbook = XLSX.readFile(filePath);
+                const sheetName = workbook.SheetNames[0]; // Assuming one sheet per file mostly
+                if (!sheetName) continue;
+
+                const worksheet = workbook.Sheets[sheetName];
+                const data = XLSX.utils.sheet_to_json(worksheet, { defval: null }); // Preserve empty cells/nulls
+                dataToRestore[tableName] = data;
+            }
+
+            // Perform insertion
+            dbManager.restoreBackupData(dataToRestore);
+            return { success: true };
+
+        } catch (error) {
+            console.error('Error restoring manual backup:', error);
+            return { success: false, error: error.message };
+        }
+    });
 }
 
-const performBackup = async () => {
+const performBackup = async (force = false) => {
     if (!dbManager) return;
 
     try {
         const config = dbManager.getStoreConfig();
-        if (config.backup_enabled === 'true' && config.backup_path) {
+        if ((config.backup_enabled === 'true' && config.backup_path) || force) {
 
-            // New Logic: Overwrite unique file .xlsx
-            const backupFile = `VentaCore_Backup.xlsx`;
-            const destination = path.join(config.backup_path, backupFile);
+            // New logic: separate tables into 'tablas copia'
+            let backupFolder = config.backup_path;
+            
+            // If forced and no backup_path provided, save to default userData
+            if (!backupFolder && force) {
+                const userDataPath = app.getPath('userData');
+                backupFolder = path.join(userDataPath, 'backups');
+                if (!fs.existsSync(backupFolder)) {
+                    fs.mkdirSync(backupFolder, { recursive: true });
+                }
+            } else if (!backupFolder) {
+                 return; // Do nothing if not forced and no path
+            }
 
-            if (!fs.existsSync(config.backup_path)) {
-                fs.mkdirSync(config.backup_path, { recursive: true });
+            const tablasCopiaPath = path.join(backupFolder, 'tablas copia');
+
+            if (!fs.existsSync(tablasCopiaPath)) {
+                fs.mkdirSync(tablasCopiaPath, { recursive: true });
             }
 
             // Get all data
             const allData = dbManager.getFullBackupData();
 
-            // Create Workbook
-            const wb = XLSX.utils.book_new();
-
-            // Add Cash Register Sheet (First one for compatibility)
-            if (allData.cash_register) {
-                const cashData = allData.cash_register.map(entry => ({
-                    'ID': entry.id,
-                    'Fecha': entry.entry_date,
-                    'Tipo': entry.type === 'income' ? 'INGRESO' : 'EGRESO',
-                    'Monto': entry.amount,
-                    'Moneda': entry.currency,
-                    'Método de Pago': entry.payment_method || '',
-                    'Descripción': entry.description || '',
-                    'Categoría': entry.expense_category || '',
-                    'ID Venta': entry.sale_id || ''
-                }));
-                const ws = XLSX.utils.json_to_sheet(cashData);
-                XLSX.utils.book_append_sheet(wb, ws, 'Libro de Caja');
-            }
-
-            // Add other sheets
+            // Export each table separately
             for (const [tableName, data] of Object.entries(allData)) {
-                if (tableName === 'cash_register') continue; // Already added formatted
-                if (data && data.length > 0) {
-                    const ws = XLSX.utils.json_to_sheet(data);
-                    XLSX.utils.book_append_sheet(wb, ws, tableName);
+                if (!data) continue;
+                
+                let excelData = data;
+                
+                // For cash register, format correctly as we did in the single file backup
+                if (tableName === 'cash_register') {
+                    excelData = data.map(entry => ({
+                        'id': entry.id,
+                        'entry_date': entry.entry_date,
+                        'type': entry.type,
+                        'amount': entry.amount,
+                        'currency': entry.currency,
+                        'payment_method': entry.payment_method,
+                        'description': entry.description,
+                        'expense_category': entry.expense_category,
+                        'sale_id': entry.sale_id,
+                        'created_at': entry.created_at
+                    }));
                 }
-            }
 
-            // Write File
-            XLSX.writeFile(wb, destination);
-            console.log(`Backup (Overwrite) successful: ${destination}`);
+                const wb = XLSX.utils.book_new();
+                const ws = XLSX.utils.json_to_sheet(excelData);
+                XLSX.utils.book_append_sheet(wb, ws, tableName);
+                
+                const tableFile = path.join(tablasCopiaPath, `${tableName}.xlsx`);
+                XLSX.writeFile(wb, tableFile);
+            }
+            
+            console.log(`Backup tables successful at: ${tablasCopiaPath}`);
         }
     } catch (error) {
         console.error('Error performing automatic backup:', error);
+        throw error; // Throw error to be caught by manual caller
     }
 };
 

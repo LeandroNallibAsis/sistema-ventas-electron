@@ -268,6 +268,50 @@ const SettingsScreen = () => {
         }
     };
 
+    const handleCreateBackup = async () => {
+        setSaving(true);
+        setMessage('⏳ Creando copia de seguridad...');
+        try {
+            const result = await window.api.invoke('create-backup-manual');
+            if (result.success) {
+                setMessage('✅ Copia de seguridad creada con éxito en "tablas copia"');
+            } else {
+                setMessage(`❌ Error al crear copia: ${result.error}`);
+            }
+            setTimeout(() => setMessage(''), 5000);
+        } catch (error) {
+            console.error('Error creating backup:', error);
+            setMessage('❌ Error al crear copia');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleRestoreBackup = async () => {
+        if (!window.confirm('⚠️ ADVERTENCIA: Esta acción REEMPLAZARÁ toda la base de datos actual con los datos de las "tablas copia". ¿Estás completamente seguro de continuar?')) {
+            return;
+        }
+        
+        setSaving(true);
+        setMessage('⏳ Restaurando copia de seguridad. Por favor espera...');
+        try {
+            const result = await window.api.invoke('restore-backup-manual');
+            if (result.success) {
+                setMessage('✅ Copia de seguridad restaurada con éxito. Por favor, reinicia la aplicación.');
+            } else {
+                setMessage(`❌ Error al restaurar: ${result.error}`);
+            }
+            // Keep message on screen longer for restart notice
+            if (result.success) setTimeout(() => setMessage(''), 8000);
+            else setTimeout(() => setMessage(''), 5000);
+        } catch (error) {
+            console.error('Error restoring backup:', error);
+            setMessage('❌ Error al restaurar copia');
+        } finally {
+            setSaving(false);
+        }
+    };
+
     if (loading) {
         return (
             <div className="p-8 flex items-center justify-center">
@@ -504,6 +548,26 @@ const SettingsScreen = () => {
                                         )}
                                     </div>
                                 )}
+
+                                <div className="pt-4 border-t border-gray-100 flex flex-col gap-3">
+                                    <button
+                                        onClick={handleCreateBackup}
+                                        disabled={saving || !storeConfig.backup_path}
+                                        className="btn bg-blue-100 text-blue-700 hover:bg-blue-200 w-full flex items-center justify-center gap-2"
+                                        title={!storeConfig.backup_path ? "Selecciona una carpeta primero" : ""}
+                                    >
+                                        <span>📥</span> Crear Copia de Seguridad Ahora
+                                    </button>
+                                    
+                                    <button
+                                        onClick={handleRestoreBackup}
+                                        disabled={saving || !storeConfig.backup_path}
+                                        className="btn bg-orange-100 text-orange-700 hover:bg-orange-200 w-full flex items-center justify-center gap-2"
+                                        title={!storeConfig.backup_path ? "Selecciona una carpeta primero" : ""}
+                                    >
+                                        <span>🔄</span> Restaurar Copia desde "tablas copia"
+                                    </button>
+                                </div>
                             </div>
                         </div>
 

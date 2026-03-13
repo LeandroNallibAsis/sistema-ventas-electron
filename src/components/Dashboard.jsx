@@ -86,6 +86,117 @@ const Dashboard = ({ onNavigate }) => {
                 </div>
             </div>
 
+            {/* Balance Financiero */}
+            <div className="space-y-4">
+                <h2 className="text-xl font-bold text-gray-800">💰 Balance Financiero</h2>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Balance del Día */}
+                    <div className="card p-6 bg-gradient-to-br from-purple-50 to-white border border-purple-100">
+                        <h3 className="text-purple-700 text-sm font-semibold uppercase mb-4 flex items-center gap-2">
+                            📅 Balance del Día
+                        </h3>
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center p-2 bg-white rounded-lg shadow-sm">
+                                <span className="text-gray-600 font-medium">ARS</span>
+                                <div className="text-right">
+                                    <div className="text-xs text-gray-500">
+                                        <span className="text-green-600">+{formatCurrency(stats.balanceSummary?.today?.ARS?.income || 0, 'ARS')}</span>
+                                        {' / '}
+                                        <span className="text-red-500">-{formatCurrency(stats.balanceSummary?.today?.ARS?.expense || 0, 'ARS')}</span>
+                                    </div>
+                                    <span className={`text-lg font-bold ${(stats.balanceSummary?.today?.ARS?.balance || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        {formatCurrency(stats.balanceSummary?.today?.ARS?.balance || 0, 'ARS')}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="flex justify-between items-center p-2 bg-white rounded-lg shadow-sm">
+                                <span className="text-gray-600 font-medium">USD</span>
+                                <div className="text-right">
+                                    <div className="text-xs text-gray-500">
+                                        <span className="text-green-600">+{formatCurrency(stats.balanceSummary?.today?.USD?.income || 0, 'USD')}</span>
+                                        {' / '}
+                                        <span className="text-red-500">-{formatCurrency(stats.balanceSummary?.today?.USD?.expense || 0, 'USD')}</span>
+                                    </div>
+                                    <span className={`text-lg font-bold ${(stats.balanceSummary?.today?.USD?.balance || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        {formatCurrency(stats.balanceSummary?.today?.USD?.balance || 0, 'USD')}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Balance de la Semana */}
+                    <div className="card p-6 bg-gradient-to-br from-blue-50 to-white border border-blue-100">
+                        <h3 className="text-blue-700 text-sm font-semibold uppercase mb-4 flex items-center gap-2">
+                            📊 Balance Semanal
+                        </h3>
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center p-2 bg-white rounded-lg shadow-sm">
+                                <span className="text-gray-600 font-medium">ARS</span>
+                                <div className="text-right">
+                                    <div className="text-xs text-gray-500">
+                                        <span className="text-green-600">+{formatCurrency(stats.balanceSummary?.week?.ARS?.income || 0, 'ARS')}</span>
+                                        {' / '}
+                                        <span className="text-red-500">-{formatCurrency(stats.balanceSummary?.week?.ARS?.expense || 0, 'ARS')}</span>
+                                    </div>
+                                    <span className={`text-lg font-bold ${(stats.balanceSummary?.week?.ARS?.balance || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        {formatCurrency(stats.balanceSummary?.week?.ARS?.balance || 0, 'ARS')}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="flex justify-between items-center p-2 bg-white rounded-lg shadow-sm">
+                                <span className="text-gray-600 font-medium">USD</span>
+                                <div className="text-right">
+                                    <div className="text-xs text-gray-500">
+                                        <span className="text-green-600">+{formatCurrency(stats.balanceSummary?.week?.USD?.income || 0, 'USD')}</span>
+                                        {' / '}
+                                        <span className="text-red-500">-{formatCurrency(stats.balanceSummary?.week?.USD?.expense || 0, 'USD')}</span>
+                                    </div>
+                                    <span className={`text-lg font-bold ${(stats.balanceSummary?.week?.USD?.balance || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        {formatCurrency(stats.balanceSummary?.week?.USD?.balance || 0, 'USD')}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Balance del Mes */}
+                    <div className="card p-6 bg-gradient-to-br from-emerald-50 to-white border border-emerald-100">
+                        <h3 className="text-emerald-700 text-sm font-semibold uppercase mb-4 flex items-center gap-2">
+                            📈 Balance Mensual
+                        </h3>
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center p-2 bg-white rounded-lg shadow-sm">
+                                <span className="text-gray-600 font-medium">ARS</span>
+                                <div className="text-right">
+                                    <div className="text-xs text-gray-500">
+                                        <span className="text-green-600">+{formatCurrency(stats.balanceSummary?.month?.ARS?.income || 0, 'ARS')}</span>
+                                        {' / '}
+                                        <span className="text-red-500">-{formatCurrency(stats.balanceSummary?.month?.ARS?.expense || 0, 'ARS')}</span>
+                                    </div>
+                                    <span className={`text-lg font-bold ${(stats.balanceSummary?.month?.ARS?.balance || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        {formatCurrency(stats.balanceSummary?.month?.ARS?.balance || 0, 'ARS')}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="flex justify-between items-center p-2 bg-white rounded-lg shadow-sm">
+                                <span className="text-gray-600 font-medium">USD</span>
+                                <div className="text-right">
+                                    <div className="text-xs text-gray-500">
+                                        <span className="text-green-600">+{formatCurrency(stats.balanceSummary?.month?.USD?.income || 0, 'USD')}</span>
+                                        {' / '}
+                                        <span className="text-red-500">-{formatCurrency(stats.balanceSummary?.month?.USD?.expense || 0, 'USD')}</span>
+                                    </div>
+                                    <span className={`text-lg font-bold ${(stats.balanceSummary?.month?.USD?.balance || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        {formatCurrency(stats.balanceSummary?.month?.USD?.balance || 0, 'USD')}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Income vs Expense Chart */}
                 <div className="card p-6">

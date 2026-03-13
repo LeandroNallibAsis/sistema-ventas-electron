@@ -60,6 +60,25 @@ const SalesHistory = () => {
         }
     };
 
+    const handleCancelSale = async (saleId) => {
+        if (!window.confirm('¿Está seguro de que desea anular esta venta? Esta acción devolverá los productos al stock, eliminará el movimiento de caja y no se puede deshacer.')) {
+            return;
+        }
+
+        try {
+            const result = await window.api.invoke('delete-sale', saleId);
+            if (result && result.success) {
+                alert('Venta anulada correctamente.\n\n- El stock fue devuelto.\n- El ingreso fue eliminado de la caja.');
+                loadSales(); // Reload the table
+            } else {
+                alert(`Error al anular venta: ${result?.error || 'Desconocido'}`);
+            }
+        } catch (error) {
+            console.error('Error cancelling sale:', error);
+            alert('Error crítico al intentar anular la venta.');
+        }
+    };
+
     const handleReprint = async (saleId) => {
         try {
             const detail = await window.api.getSaleDetail(saleId);
@@ -233,6 +252,13 @@ const SalesHistory = () => {
                                                     title="Reimprimir Ticket"
                                                 >
                                                     🖨️
+                                                </button>
+                                                <button
+                                                    onClick={() => handleCancelSale(sale.id)}
+                                                    className="text-danger-600 hover:text-danger-800 font-medium whitespace-nowrap ml-3"
+                                                    title="Anular Venta"
+                                                >
+                                                    ❌ Anular
                                                 </button>
                                             </td>
                                         </tr>

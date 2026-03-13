@@ -575,6 +575,13 @@ class DatabaseManager {
         return stmt.run(id);
     }
 
+    deleteCategories(ids) {
+        if (!ids || ids.length === 0) return { changes: 0 };
+        const placeholders = ids.map(() => '?').join(',');
+        const stmt = this.db.prepare(`DELETE FROM categories WHERE id IN (${placeholders})`);
+        return stmt.run(...ids);
+    }
+
     // Product operations
     getProducts(categoryId) {
         if (categoryId) {
@@ -626,6 +633,13 @@ class DatabaseManager {
     deleteProduct(id) {
         const stmt = this.db.prepare('DELETE FROM products WHERE id = ?');
         return stmt.run(id);
+    }
+
+    deleteProducts(ids) {
+        if (!ids || ids.length === 0) return { changes: 0 };
+        const placeholders = ids.map(() => '?').join(',');
+        const stmt = this.db.prepare(`DELETE FROM products WHERE id IN (${placeholders})`);
+        return stmt.run(...ids);
     }
 
     // POS Operations
@@ -814,6 +828,40 @@ class DatabaseManager {
         return stmt.all(saleId);
     }
 
+    deleteSale(saleId) {
+        const transaction = this.db.transaction((id) => {
+            // 1. Get sale items to restore stock
+            const items = this.db.prepare('SELECT product_id, quantity FROM sale_items WHERE sale_id = ?').all(id);
+            
+            // 2. Restore stock
+            const updateStock = this.db.prepare('UPDATE products SET stock = stock + ? WHERE id = ?');
+            for (const item of items) {
+                updateStock.run(item.quantity, item.product_id);
+            }
+
+            // 3. Check for specific movements and revert them
+            const sale = this.db.prepare('SELECT payment_method, client_id, total FROM sales WHERE id = ?').get(id);
+            if (sale && sale.payment_method === 'current_account' && sale.client_id) {
+                // Remove the movement from client_movements
+                this.db.prepare('DELETE FROM client_movements WHERE reference_id = ? AND type = "debit" AND client_id = ?').run(id, sale.client_id);
+                // Update client balance (revert the debt addition)
+                this.db.prepare('UPDATE clients SET current_account_balance = current_account_balance - ? WHERE id = ?').run(sale.total, sale.client_id);
+            } else {
+                // 4. Remove from cash register
+                this.db.prepare('DELETE FROM cash_register WHERE sale_id = ?').run(id);
+            }
+
+            // 5. Remove sale_items (handled by ON DELETE CASCADE usually, but explicit is safer if not fully supported without pragma)
+            this.db.prepare('DELETE FROM sale_items WHERE sale_id = ?').run(id);
+
+            // 6. Delete the sale itself
+            const stmt = this.db.prepare('DELETE FROM sales WHERE id = ?');
+            return stmt.run(id);
+        });
+
+        return transaction(saleId);
+    }
+
     // Cash Register Operations
     getCashRegisterEntries(filters = {}) {
         let query = `
@@ -910,6 +958,11 @@ class DatabaseManager {
         };
     }
 
+    deleteCashEntry(id) {
+        const stmt = this.db.prepare('DELETE FROM cash_register WHERE id = ?');
+        return stmt.run(id);
+    }
+
     importCashRegister(data, mode) {
         const importTx = this.db.transaction((entries) => {
             if (mode === 'replace') {
@@ -985,6 +1038,39 @@ class DatabaseManager {
             month: this.db.prepare("SELECT COUNT(*) as count, SUM(total) as total FROM sales WHERE sale_date >= ?").get(startOfMonth)
         };
 
+        // Balance Summaries (income - expense) for day, week, month
+        const balanceQuery = `
+            SELECT 
+                SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) as income,
+                SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) as expense
+            FROM cash_register 
+            WHERE currency = ? AND entry_date >= ?
+        `;
+
+        const calculateBalance = (currency, startDate) => {
+            const result = this.db.prepare(balanceQuery).get(currency, startDate);
+            return {
+                income: result.income || 0,
+                expense: result.expense || 0,
+                balance: (result.income || 0) - (result.expense || 0)
+            };
+        };
+
+        const balanceSummary = {
+            today: {
+                ARS: calculateBalance('ARS', startOfDay),
+                USD: calculateBalance('USD', startOfDay)
+            },
+            week: {
+                ARS: calculateBalance('ARS', startOfWeek.toISOString()),
+                USD: calculateBalance('USD', startOfWeek.toISOString())
+            },
+            month: {
+                ARS: calculateBalance('ARS', startOfMonth),
+                USD: calculateBalance('USD', startOfMonth)
+            }
+        };
+
         // Low Stock (<= 5)
         const lowStock = this.db.prepare(`
             SELECT p.*, c.name as category_name 
@@ -1028,6 +1114,7 @@ class DatabaseManager {
 
         return {
             salesSummary,
+            balanceSummary,
             lowStock,
             topProducts,
             last7Days
@@ -1680,6 +1767,40 @@ class DatabaseManager {
         }
 
         return backupData;
+    }
+
+    restoreBackupData(backupData) {
+        const restoreTx = this.db.transaction((data) => {
+            // Disable foreign keys temporarily for bulk restore
+            this.db.pragma('foreign_keys = OFF');
+            
+            for (const [table, rows] of Object.entries(data)) {
+                if (!rows || rows.length === 0) continue;
+                
+                // Clear existing table data
+                this.db.prepare(`DELETE FROM ${table}`).run();
+                
+                // Reset autoincrement sequence if exists
+                try {
+                    this.db.prepare(`DELETE FROM sqlite_sequence WHERE name=?`).run(table);
+                } catch(e) { /* ignore if sequence doesn't exist */ }
+
+                // Dynamically build insert statement based on first row keys
+                const columns = Object.keys(rows[0]);
+                const placeholders = columns.map(() => '?').join(', ');
+                const stmt = this.db.prepare(`INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`);
+                
+                for (const row of rows) {
+                    const values = columns.map(col => row[col]);
+                    stmt.run(...values);
+                }
+            }
+            
+            // Re-enable foreign keys
+            this.db.pragma('foreign_keys = ON');
+        });
+
+        return restoreTx(backupData);
     }
 
     close() {

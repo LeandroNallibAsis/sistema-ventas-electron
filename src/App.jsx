@@ -170,6 +170,20 @@ function App() {
     }
   };
 
+  const handleDeleteMultipleCategories = async (ids) => {
+    try {
+      await window.api.invoke('delete-multiple-categories', ids);
+      await loadCategories();
+      if (selectedCategory && ids.includes(selectedCategory.id)) {
+        setSelectedCategory(null);
+      }
+      addNotification('Éxito', `${ids.length} categorías eliminadas`, 'success', 3000);
+    } catch (error) {
+      console.error('Error deleting multiple categories:', error);
+      alert('Error al eliminar categorías');
+    }
+  };
+
   const handleCreateProduct = async (productData) => {
     try {
       await window.api.createProduct(productData);
@@ -201,6 +215,17 @@ function App() {
     } catch (error) {
       console.error('Error deleting product:', error);
       alert('Error al eliminar producto');
+    }
+  };
+
+  const handleDeleteMultipleProducts = async (ids) => {
+    try {
+      await window.api.invoke('delete-multiple-products', ids);
+      await loadProducts(selectedCategory.id);
+      addNotification('Éxito', `${ids.length} productos eliminados`, 'success', 3000);
+    } catch (error) {
+      console.error('Error deleting multiple products:', error);
+      alert('Error al eliminar productos');
     }
   };
 
@@ -319,6 +344,7 @@ function App() {
               onSelectCategory={setSelectedCategory}
               onCreateCategory={handleCreateCategory}
               onDeleteCategory={handleDeleteCategory}
+              onDeleteMultipleCategories={handleDeleteMultipleCategories}
               readOnly={user?.role === 'seller'}
             />
 
@@ -363,6 +389,7 @@ function App() {
                       products={products}
                       onEdit={handleEditProduct}
                       onDelete={handleDeleteProduct}
+                      onDeleteMultiple={handleDeleteMultipleProducts}
                       onShowBarcode={setShowBarcode}
                       readOnly={user?.role === 'seller'}
                     />
